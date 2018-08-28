@@ -1,68 +1,79 @@
 package provider
 
-import "sync"
+import (
+	"errors"
+	"sync"
+
+	"github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
+)
 
 var defaultProviderFactory = newFactory()
+
+// ErrProviderNotFound is an error which is used when we try to create a new
+// client for a given provider which isn't registered with the factory.
+var ErrProviderNotFound = errors.New("The specified provider can't be found.")
+
+// FactoryFunc is the interface used to allow creating a new provider. This
+// shoud be used by provider wrappers to allow for creating new clients.
+type FactoryFunc func(v1alpha1.ProviderSpec) (Interface, error)
 
 // FactoryInterface is the interface used for a ProviderFactory. It allows you
 // to fetch providers from a local store and use them to configure monitors.
 type FactoryInterface interface {
-	Deregister(string)
-	Get(string) (Interface, bool)
-	Register(string, Interface)
+	Register(string, FactoryFunc)
+	From(v1alpha1.ProviderSpec) (Interface, error)
 }
 
-// RegisterProvider registers a provider which can be used from within the
-// Factory to create new Monitors.
-func RegisterProvider(name string, provider Interface) {
-	defaultProviderFactory.Register(name, provider)
+// Register registers a provider which can be used from within the Factory to
+// create new Monitors.
+func Register(name string, ff FactoryFunc) {
+	defaultProviderFactory.Register(name, ff)
 }
 
-// Get returns the provider for a given name.
-func Get(name string) (Interface, bool) {
-	return defaultProviderFactory.Get(name)
-}
-
-// DeregisterProvider removes a provider from the registry.
-func DeregisterProvider(name string) {
-	defaultProviderFactory.Deregister(name)
+// From returns a provider from the given ProviderSpec.
+func From(prov v1alpha1.ProviderSpec) (Interface, error) {
+	return defaultProviderFactory.From(prov)
 }
 
 // SimpleFactory is a factory object that knows how to get providers.
 type SimpleFactory struct {
-	providers map[string]Interface
+	providers map[string]FactoryFunc
 	lock      sync.RWMutex
 }
 
 // Register registers the given provider with the factory under the given name.
-func (pf *SimpleFactory) Register(name string, provider Interface) {
+func (pf *SimpleFactory) Register(name string, ff FactoryFunc) {
 	pf.lock.Lock()
 	defer pf.lock.Unlock()
 
-	pf.providers[name] = provider
+	pf.providers[name] = ff
 }
 
-// Get gets the registered provider for the given name.
-func (pf *SimpleFactory) Get(name string) (Interface, bool) {
+// From creates a new provider from the given configuration. This can then be
+// used to register the provider within the
+func (pf *SimpleFactory) From(prov v1alpha1.ProviderSpec) (Interface, error) {
 	pf.lock.RLock()
 	defer pf.lock.RUnlock()
 
-	pr, ok := pf.providers[name]
-	return pr, ok
+	pr, ok := pf.providers[prov.Type]
+	if !ok {
+		return nil, ErrProviderNotFound
+	}
+
+	return pr(prov)
 }
 
-// Deregister deregisters the provider with the given name.
-func (pf *SimpleFactory) Deregister(name string) {
+// Flush resets all FactoryFuncs
+func (pf *SimpleFactory) Flush() {
 	pf.lock.Lock()
 	defer pf.lock.Unlock()
 
-	delete(pf.providers, name)
+	pf.providers = map[string]FactoryFunc{}
 }
 
 func newFactory() *SimpleFactory {
 	return &SimpleFactory{
-		providers: map[string]Interface{},
-		lock:      sync.RWMutex{},
+		providers: map[string]FactoryFunc{},
 	}
 }
 

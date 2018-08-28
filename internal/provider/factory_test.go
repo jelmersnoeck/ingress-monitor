@@ -4,43 +4,45 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider/fake"
 )
 
 func TestProviderFactory(t *testing.T) {
-	testProvider := &fake.SimpleProvider{}
-
-	provider.RegisterProvider("simple", testProvider)
-
-	pr, ok := provider.Get("simple")
-	if !ok {
-		t.Fatalf("Expected a provider to be registered, got none")
+	reset := func() {
+		provider.DefaultFactory().Flush()
 	}
 
-	if !reflect.DeepEqual(pr, testProvider) {
-		t.Errorf("Expected the fetched provider to equal the registered provider")
-	}
+	t.Run("with registered provider", func(t *testing.T) {
+		defer reset()
 
-	newProvider := &fake.SimpleProvider{
-		CreateFunc: func(provider.IngressMonitor) error {
-			return nil
-		},
-	}
-	provider.RegisterProvider("simple", newProvider)
+		prov := new(fake.SimpleProvider)
 
-	pr, ok = provider.Get("simple")
-	if !ok {
-		t.Fatalf("Expected a provider to be registered, got none")
-	}
+		provider.Register("simple", fake.FactoryFunc(prov))
 
-	if reflect.DeepEqual(pr, testProvider) || !reflect.DeepEqual(pr, newProvider) {
-		t.Errorf("Expected the fetched provider to equal the newProvider, not the testProvider")
-	}
+		cl, err := provider.From(v1alpha1.ProviderSpec{
+			Type: "simple",
+		})
 
-	provider.DeregisterProvider("simple")
+		if err != nil {
+			t.Fatalf("Expected no error getting the provider, got: %s", err)
+		}
 
-	if _, ok = provider.Get("simple"); ok {
-		t.Fatalf("Expected no provider to be registered, got one")
-	}
+		if !reflect.DeepEqual(cl, prov) {
+			t.Errorf("Expected new client to be the test client")
+		}
+	})
+
+	t.Run("without registered provider", func(t *testing.T) {
+		defer reset()
+
+		_, err := provider.DefaultFactory().From(v1alpha1.ProviderSpec{
+			Type: "simple",
+		})
+
+		if err != provider.ErrProviderNotFound {
+			t.Errorf("Expected error `%s`, got `%s`", provider.ErrProviderNotFound, err)
+		}
+	})
 }

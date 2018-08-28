@@ -50,10 +50,14 @@ type MonitorTemplate struct {
 
 // HTTPTemplate describes the configuration options for a HTTP Check.
 type HTTPTemplate struct {
-	// URL describes the URL we want to check for the given website. Defaults to
-	// `/_healthz`.
+	// URL describes the fully qualified URL that will be used for the monitor.
 	// +optional
 	URL *string `json:"url,omitempty"`
+
+	// Endpoint describes the Endpoint we want to check for the given website.
+	// Defaults to `/_healthz`.
+	// +optional
+	Endpoint *string `json:"endpoint,omitempty"`
 
 	// CustomHeader is a special header that will be sent along with the check
 	// request. Defaults to the provider's default.

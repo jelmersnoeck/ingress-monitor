@@ -24,6 +24,8 @@
 
 package v1alpha1
 
+type IngressMonitorExpansion interface{}
+
 type MonitorExpansion interface{}
 
 type ProviderExpansion interface{}

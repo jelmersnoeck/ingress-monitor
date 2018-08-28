@@ -59,6 +59,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=ingressmonitor.sphc.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("ingressmonitors"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Ingressmonitor().V1alpha1().IngressMonitors().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("monitors"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Ingressmonitor().V1alpha1().Monitors().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("providers"):

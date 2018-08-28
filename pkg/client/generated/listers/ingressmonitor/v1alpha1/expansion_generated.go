@@ -24,6 +24,14 @@
 
 package v1alpha1
 
+// IngressMonitorListerExpansion allows custom methods to be added to
+// IngressMonitorLister.
+type IngressMonitorListerExpansion interface{}
+
+// IngressMonitorNamespaceListerExpansion allows custom methods to be added to
+// IngressMonitorNamespaceLister.
+type IngressMonitorNamespaceListerExpansion interface{}
+
 // MonitorListerExpansion allows custom methods to be added to
 // MonitorLister.
 type MonitorListerExpansion interface{}

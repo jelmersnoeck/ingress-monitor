@@ -33,6 +33,7 @@ import (
 
 type IngressmonitorV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	IngressMonitorsGetter
 	MonitorsGetter
 	ProvidersGetter
 }
@@ -40,6 +41,10 @@ type IngressmonitorV1alpha1Interface interface {
 // IngressmonitorV1alpha1Client is used to interact with features provided by the ingressmonitor.sphc.io group.
 type IngressmonitorV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *IngressmonitorV1alpha1Client) IngressMonitors(namespace string) IngressMonitorInterface {
+	return newIngressMonitors(c, namespace)
 }
 
 func (c *IngressmonitorV1alpha1Client) Monitors(namespace string) MonitorInterface {

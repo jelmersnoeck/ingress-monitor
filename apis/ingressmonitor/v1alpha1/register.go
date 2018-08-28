@@ -37,6 +37,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&MonitorList{},
 		&Provider{},
 		&ProviderList{},
+		&IngressMonitor{},
+		&IngressMonitorList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

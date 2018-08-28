@@ -34,6 +34,10 @@ type FakeIngressmonitorV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeIngressmonitorV1alpha1) IngressMonitors(namespace string) v1alpha1.IngressMonitorInterface {
+	return &FakeIngressMonitors{c, namespace}
+}
+
 func (c *FakeIngressmonitorV1alpha1) Monitors(namespace string) v1alpha1.MonitorInterface {
 	return &FakeMonitors{c, namespace}
 }

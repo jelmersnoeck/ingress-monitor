@@ -5,8 +5,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// IngressMonitorSpec is the detailed configuration for an IngressMonitor.
-type IngressMonitorSpec struct {
+// MonitorSpec is the detailed configuration for an Monitor.
+type MonitorSpec struct {
 	// Selector describes the LabelSelector which will be used to select the
 	// enabled Ingresses which we want to set up monitors for.
 	Selector metav1.LabelSelector `json:"selector"`
@@ -16,11 +16,11 @@ type IngressMonitorSpec struct {
 	Provider v1.LocalObjectReference `json:"provider"`
 
 	// Template describes the monitor configuration.
-	Template IngressMonitorTemplate `json:"template"`
+	Template MonitorTemplate `json:"template"`
 }
 
-// IngressMonitorTemplate allow
-type IngressMonitorTemplate struct {
+// MonitorTemplate allow
+type MonitorTemplate struct {
 	// Type describes the type of check we want to use.
 	Type string `json:"type"`
 
@@ -84,21 +84,21 @@ type HTTPTemplate struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// IngressMonitor is the CRD specification for an IngressMonitor. This
-// IngressMonitor allows you to configure monitors for the resources selected
+// Monitor is the CRD specification for an Monitor. This
+// Monitor allows you to configure monitors for the resources selected
 // by it's configuration and instantiate them in the specified MonitorProvider.
-type IngressMonitor struct {
+type Monitor struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
-	Spec IngressMonitorSpec `json:"spec"`
+	Spec MonitorSpec `json:"spec"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// IngressMonitorList is a list of IngressMonitors
-type IngressMonitorList struct {
+// MonitorList is a list of Monitors
+type MonitorList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
-	Items           []IngressMonitor `json:"items"`
+	Items           []Monitor `json:"items"`
 }

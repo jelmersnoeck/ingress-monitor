@@ -37,59 +37,59 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// IngressMonitorInformer provides access to a shared informer and lister for
-// IngressMonitors.
-type IngressMonitorInformer interface {
+// ProviderInformer provides access to a shared informer and lister for
+// Providers.
+type ProviderInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.IngressMonitorLister
+	Lister() v1alpha1.ProviderLister
 }
 
-type ingressMonitorInformer struct {
+type providerInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewIngressMonitorInformer constructs a new informer for IngressMonitor type.
+// NewProviderInformer constructs a new informer for Provider type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewIngressMonitorInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredIngressMonitorInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewProviderInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredProviderInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredIngressMonitorInformer constructs a new informer for IngressMonitor type.
+// NewFilteredProviderInformer constructs a new informer for Provider type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredIngressMonitorInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredProviderInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.IngressmonitorV1alpha1().IngressMonitors(namespace).List(options)
+				return client.IngressmonitorV1alpha1().Providers(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.IngressmonitorV1alpha1().IngressMonitors(namespace).Watch(options)
+				return client.IngressmonitorV1alpha1().Providers(namespace).Watch(options)
 			},
 		},
-		&ingressmonitorv1alpha1.IngressMonitor{},
+		&ingressmonitorv1alpha1.Provider{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *ingressMonitorInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredIngressMonitorInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *providerInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredProviderInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *ingressMonitorInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&ingressmonitorv1alpha1.IngressMonitor{}, f.defaultInformer)
+func (f *providerInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&ingressmonitorv1alpha1.Provider{}, f.defaultInformer)
 }
 
-func (f *ingressMonitorInformer) Lister() v1alpha1.IngressMonitorLister {
-	return v1alpha1.NewIngressMonitorLister(f.Informer().GetIndexer())
+func (f *providerInformer) Lister() v1alpha1.ProviderLister {
+	return v1alpha1.NewProviderLister(f.Informer().GetIndexer())
 }

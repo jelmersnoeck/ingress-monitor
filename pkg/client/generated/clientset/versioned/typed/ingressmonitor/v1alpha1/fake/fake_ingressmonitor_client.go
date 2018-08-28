@@ -34,12 +34,12 @@ type FakeIngressmonitorV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeIngressmonitorV1alpha1) IngressMonitors(namespace string) v1alpha1.IngressMonitorInterface {
-	return &FakeIngressMonitors{c, namespace}
+func (c *FakeIngressmonitorV1alpha1) Monitors(namespace string) v1alpha1.MonitorInterface {
+	return &FakeMonitors{c, namespace}
 }
 
-func (c *FakeIngressmonitorV1alpha1) MonitorProviders(namespace string) v1alpha1.MonitorProviderInterface {
-	return &FakeMonitorProviders{c, namespace}
+func (c *FakeIngressmonitorV1alpha1) Providers(namespace string) v1alpha1.ProviderInterface {
+	return &FakeProviders{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

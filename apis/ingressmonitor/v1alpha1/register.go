@@ -8,7 +8,7 @@ import (
 
 var (
 	// SchemeBuilder collects the scheme builder functions for the
-	// IngressMonitor Custom Resources.
+	// Monitor Custom Resources.
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 
 	// AddToScheme applies the SchemeBuilder functions to a specified scheme
@@ -16,25 +16,27 @@ var (
 )
 
 const (
-	// GroupName is the group name for the IngressMonitor CRD.
+	// GroupName is the group name for the Monitor CRD.
 	GroupName = "ingressmonitor.sphc.io"
 
 	// APIVersion is the version for the API
 	APIVersion = "v1alpha1"
 )
 
-// SchemeGroupVersion is the GroupVersion for the IngressMonitor CRD.
+// SchemeGroupVersion is the GroupVersion for the Monitor CRD.
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: APIVersion}
 
-// Resource gets an IngressMonitor GroupResource for a specified resource.
+// Resource gets an Monitor GroupResource for a specified resource.
 func Resource(resource string) schema.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&IngressMonitor{},
-		&IngressMonitorList{},
+		&Monitor{},
+		&MonitorList{},
+		&Provider{},
+		&ProviderList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

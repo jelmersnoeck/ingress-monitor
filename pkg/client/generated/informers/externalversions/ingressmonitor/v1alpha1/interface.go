@@ -30,10 +30,10 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// IngressMonitors returns a IngressMonitorInformer.
-	IngressMonitors() IngressMonitorInformer
-	// MonitorProviders returns a MonitorProviderInformer.
-	MonitorProviders() MonitorProviderInformer
+	// Monitors returns a MonitorInformer.
+	Monitors() MonitorInformer
+	// Providers returns a ProviderInformer.
+	Providers() ProviderInformer
 }
 
 type version struct {
@@ -47,12 +47,12 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// IngressMonitors returns a IngressMonitorInformer.
-func (v *version) IngressMonitors() IngressMonitorInformer {
-	return &ingressMonitorInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+// Monitors returns a MonitorInformer.
+func (v *version) Monitors() MonitorInformer {
+	return &monitorInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// MonitorProviders returns a MonitorProviderInformer.
-func (v *version) MonitorProviders() MonitorProviderInformer {
-	return &monitorProviderInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+// Providers returns a ProviderInformer.
+func (v *version) Providers() ProviderInformer {
+	return &providerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

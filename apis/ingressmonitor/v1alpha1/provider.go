@@ -5,8 +5,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// MonitorProviderSpec is the detailed configuration for a MonitorProvider.
-type MonitorProviderSpec struct {
+// ProviderSpec is the detailed configuration for a Provider.
+type ProviderSpec struct {
 	// Type describes the type of Provider which this CRD will configure.
 	Type string `json:"type"`
 
@@ -45,21 +45,21 @@ type SecretVar struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MonitorProvider is the CRD specification for an MonitorProvider. This
-// MonitorProvider allows you to configure providers which will be used to set
+// Provider is the CRD specification for an Provider. This
+// Provider allows you to configure providers which will be used to set
 // up monitors.
-type MonitorProvider struct {
+type Provider struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
-	Spec MonitorProviderSpec `json:"spec"`
+	Spec ProviderSpec `json:"spec"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MonitorProviderList is a list of MonitorProviders.
-type MonitorProviderList struct {
+// ProviderList is a list of Providers.
+type ProviderList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
-	Items           []MonitorProvider `json:"items"`
+	Items           []Provider `json:"items"`
 }

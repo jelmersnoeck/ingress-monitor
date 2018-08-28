@@ -37,59 +37,59 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// MonitorProviderInformer provides access to a shared informer and lister for
-// MonitorProviders.
-type MonitorProviderInformer interface {
+// MonitorInformer provides access to a shared informer and lister for
+// Monitors.
+type MonitorInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.MonitorProviderLister
+	Lister() v1alpha1.MonitorLister
 }
 
-type monitorProviderInformer struct {
+type monitorInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewMonitorProviderInformer constructs a new informer for MonitorProvider type.
+// NewMonitorInformer constructs a new informer for Monitor type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewMonitorProviderInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredMonitorProviderInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewMonitorInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredMonitorInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredMonitorProviderInformer constructs a new informer for MonitorProvider type.
+// NewFilteredMonitorInformer constructs a new informer for Monitor type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredMonitorProviderInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredMonitorInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.IngressmonitorV1alpha1().MonitorProviders(namespace).List(options)
+				return client.IngressmonitorV1alpha1().Monitors(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.IngressmonitorV1alpha1().MonitorProviders(namespace).Watch(options)
+				return client.IngressmonitorV1alpha1().Monitors(namespace).Watch(options)
 			},
 		},
-		&ingressmonitorv1alpha1.MonitorProvider{},
+		&ingressmonitorv1alpha1.Monitor{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *monitorProviderInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredMonitorProviderInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *monitorInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredMonitorInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *monitorProviderInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&ingressmonitorv1alpha1.MonitorProvider{}, f.defaultInformer)
+func (f *monitorInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&ingressmonitorv1alpha1.Monitor{}, f.defaultInformer)
 }
 
-func (f *monitorProviderInformer) Lister() v1alpha1.MonitorProviderLister {
-	return v1alpha1.NewMonitorProviderLister(f.Informer().GetIndexer())
+func (f *monitorInformer) Lister() v1alpha1.MonitorLister {
+	return v1alpha1.NewMonitorLister(f.Informer().GetIndexer())
 }

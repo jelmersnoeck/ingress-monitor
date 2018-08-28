@@ -13,7 +13,7 @@ func TestProviderFactory(t *testing.T) {
 
 	provider.RegisterProvider("simple", testProvider)
 
-	pr, ok := provider.ProviderFor("simple")
+	pr, ok := provider.Get("simple")
 	if !ok {
 		t.Fatalf("Expected a provider to be registered, got none")
 	}
@@ -29,7 +29,7 @@ func TestProviderFactory(t *testing.T) {
 	}
 	provider.RegisterProvider("simple", newProvider)
 
-	pr, ok = provider.ProviderFor("simple")
+	pr, ok = provider.Get("simple")
 	if !ok {
 		t.Fatalf("Expected a provider to be registered, got none")
 	}
@@ -40,7 +40,7 @@ func TestProviderFactory(t *testing.T) {
 
 	provider.DeregisterProvider("simple")
 
-	if _, ok = provider.ProviderFor("simple"); ok {
+	if _, ok = provider.Get("simple"); ok {
 		t.Fatalf("Expected no provider to be registered, got one")
 	}
 }

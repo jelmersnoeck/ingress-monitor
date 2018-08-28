@@ -33,8 +33,8 @@ import (
 
 type IngressmonitorV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	IngressMonitorsGetter
-	MonitorProvidersGetter
+	MonitorsGetter
+	ProvidersGetter
 }
 
 // IngressmonitorV1alpha1Client is used to interact with features provided by the ingressmonitor.sphc.io group.
@@ -42,12 +42,12 @@ type IngressmonitorV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *IngressmonitorV1alpha1Client) IngressMonitors(namespace string) IngressMonitorInterface {
-	return newIngressMonitors(c, namespace)
+func (c *IngressmonitorV1alpha1Client) Monitors(namespace string) MonitorInterface {
+	return newMonitors(c, namespace)
 }
 
-func (c *IngressmonitorV1alpha1Client) MonitorProviders(namespace string) MonitorProviderInterface {
-	return newMonitorProviders(c, namespace)
+func (c *IngressmonitorV1alpha1Client) Providers(namespace string) ProviderInterface {
+	return newProviders(c, namespace)
 }
 
 // NewForConfig creates a new IngressmonitorV1alpha1Client for the given config.

@@ -10,6 +10,15 @@ monitoring for your Kubernetes Ingress and Service objects.
 This is still a WIP. Currently resource syncs are not entirely implemented and
 no provider mappings have been implemented.
 
+## Installation
+
+To install the Operator, make sure you have RBAC enabled in your cluster.
+
+```
+kubectl apply -f https://raw.githubusercontent.com/jelmersnoeck/ingress-monitor/master/docs/kube/with-rbac.yaml
+```
+
+
 ## Supported Providers
 
 Providers are used to indicate where we want to set up a monitor. Multiple
@@ -31,3 +40,8 @@ to send notifications to.
 
 All values follow the `EnvVar` schema, meaning you can use plaintext `values` or
 `secretKeyRef`. We recommend using the `secretKeyRef`.
+
+## Design
+
+For more information about the design of this project, have a look at the
+[design documents](./docs/design/README.md).

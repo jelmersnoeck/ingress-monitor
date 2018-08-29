@@ -1,0 +1,131 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-monitor
+
+---
+
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: providers.ingressmonitor.sphc.io
+  labels:
+    component: provider
+spec:
+  group: ingressmonitor.sphc.io
+  version: v1alpha1
+  scope: Cluster
+  names:
+    plural: providers
+    kind: Provider
+
+---
+
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: monitortemplates.ingressmonitor.sphc.io
+  labels:
+    component: monitortemplate
+spec:
+  group: ingressmonitor.sphc.io
+  version: v1alpha1
+  scope: Cluster
+  names:
+    plural: monitortemplates
+    kind: MonitorTemplate
+
+---
+
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: monitors.ingressmonitor.sphc.io
+  labels:
+    component: monitor
+spec:
+  group: ingressmonitor.sphc.io
+  version: v1alpha1
+  scope: Namespaced
+  names:
+    plural: monitors
+    kind: Monitor
+
+---
+
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: ingressmonitors.ingressmonitor.sphc.io
+  labels:
+    component: ingressmonitor
+spec:
+  group: ingressmonitor.sphc.io
+  version: v1alpha1
+  scope: Namespaced
+  names:
+    plural: ingressmonitors
+    kind: IngressMonitor
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: ingress-monitor:operator
+rules:
+  - apiGroups: ["ingressmonitor.sphc.io"]
+    resources: ["providers", "monitors", "ingressmonitors"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: ingress-monitor:operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ingress-monitor:operator
+subjects:
+  - name: ingress-monitor
+    namespace: ingress-monitor
+    kind: ServiceAccount
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ingress-monitor
+  namespace: ingress-monitor
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: ingress-monitor-operator
+  namespace: ingress-monitor
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: ingress-monitor-operator
+    spec:
+      serviceAccountName: ingress-monitor
+      containers:
+        - name: ingress-monitor-operator
+          image: jelmersnoeck/ingress-monitor:latest
+          imagePullPolicy: IfNotPresent
+          args:
+          - operator
+          resources:
+            requests:
+              cpu: 10m
+              memory: 10Mi
+            requests:
+              cpu: 10m
+              memory: 10Mi

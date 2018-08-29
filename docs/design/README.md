@@ -14,14 +14,19 @@ applications which each have their own alert group.
 For example, for backend applications, you want to alert your backend team. For
 frontend applications, you want to alert your frontend team.
 
+A Provider is Cluster scoped, meaning you can reference it from any namespace.
+
 For more information, see the [Provider documentation](./provider.md)
 
-## Monitor
+## MonitorTemplate
 
 A Monitor is a high level configuration to set up checks for your Ingresses. A
 Monitor can be used to cover multiple Ingresses.
 
-For more information, see the [Monitor documentation](./monitor.md)
+A MonitorTemplate is Cluster scoped, meaning you can reference it from any
+namespace.
+
+For more information, see the [Monitor documentation](./monitor-template.md)
 
 ## IngressMonitor
 

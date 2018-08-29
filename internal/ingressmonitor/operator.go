@@ -10,9 +10,18 @@ import (
 	crdscheme "github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned/scheme"
 	"github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/informers/externalversions"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+)
+
+const (
+	monitorLabel     = "ingressmonitor.sphc.io/monitor"
+	ingressLabel     = "ingressmonitor.sphc.io/ingress"
+	ingressHostLabel = "ingressmonitor.sphc.io/ingress-path"
 )
 
 // Operator is the operator that handles configuring the Monitors.
@@ -93,6 +102,10 @@ func (o *Operator) OnAdd(obj interface{}) {
 			log.Printf("Could not update IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
 			return
 		}
+	case *v1alpha1.Monitor:
+		if err := o.handleMonitor(obj); err != nil {
+			log.Printf("Error adding monitor to the cluster: %s", err)
+		}
 	}
 }
 
@@ -130,4 +143,113 @@ func (o *Operator) OnDelete(obj interface{}) {
 			return
 		}
 	}
+}
+
+func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
+	prov, err := o.imClient.Ingressmonitor().Providers(obj.Namespace).
+		Get(obj.Spec.Provider.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	tmpl, err := o.imClient.Ingressmonitor().MonitorTemplates(obj.Namespace).
+		Get(obj.Spec.Template.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	opts := metav1.ListOptions{
+		LabelSelector: labels.FormatLabels(obj.Spec.Selector.MatchLabels),
+	}
+	ingressList, err := o.kubeClient.Extensions().Ingresses(obj.Namespace).List(opts)
+	if err != nil {
+		return err
+	}
+
+	// We'll calculate all the IngressMonitors that shouldn't be tracked
+	// anymore and delete them. We can do this by fetching all
+	// IngressMonitors where the owner is this Monitor, go over them all and
+	// see if there are any where the Ingress Owner isn't in the new Ingress
+	// List.
+	imList, err := o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).
+		List(metav1.ListOptions{
+			LabelSelector: labels.FormatLabels(map[string]string{
+				monitorLabel: obj.Name,
+			}),
+		})
+	if err != nil {
+		return err
+	}
+	for _, im := range imList.Items {
+		var isActive bool
+
+		// Go through all newly selected Ingresses and see if this
+		// IngressMonitor is active for any of them. We do this by first
+		// validating if it's controlled by the Ingress, and if so we check if
+		// it matches any of the rules. Ingresses might change which means a
+		// specific rule can be dropped. We need to GC that.
+		for _, ing := range ingressList.Items {
+			if metav1.IsControlledBy(&im, &ing) {
+				for _, rule := range ing.Spec.Rules {
+					if rule.Host == im.Labels[ingressHostLabel] {
+						isActive = true
+					}
+				}
+			}
+		}
+
+		// The IngressMonitor doesn't appear in any newly selected Ingress
+		// anymore, which means it's ready for GarbageCollection. Delete the
+		// IngressMonitor Resource from the server, which will then trigger a
+		// reconciliation to take care of actually removing the monitor with the
+		// provider.
+		if !isActive {
+			o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).
+				Delete(im.Name, &metav1.DeleteOptions{})
+		}
+	}
+
+	// reconcile the newly selected Ingresses. We'll create new IngressMonitors
+	// for each Ingress and it's subsequent rules. If it already exists, we
+	// update it.
+	for _, ing := range ingressList.Items {
+		for _, rule := range ing.Spec.Rules {
+			im := &v1alpha1.IngressMonitor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ing.Name,
+					Namespace: ing.Namespace,
+					// Add OwnerReferences to the IngressMonitor so we can
+					// automatically Garbage Collect when either a Monitor is
+					// removed or when the Ingress is removed. This way we don't
+					// have to set this up ourselves.
+					OwnerReferences: []metav1.OwnerReference{
+						*metav1.NewControllerRef(
+							obj,
+							v1alpha1.SchemeGroupVersion.WithKind("Monitor"),
+						),
+						*metav1.NewControllerRef(
+							&ing,
+							extensions.SchemeGroupVersion.WithKind("Ingress"),
+						),
+					},
+					// Set some labels so it's easier to filter later on
+					Labels: map[string]string{
+						monitorLabel:     obj.Name,
+						ingressLabel:     ing.Name,
+						ingressHostLabel: rule.Host,
+					},
+				},
+				Spec: v1alpha1.IngressMonitorSpec{
+					Provider: prov.Spec,
+					Template: tmpl.Spec,
+				},
+			}
+
+			if _, err := o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).Create(im); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

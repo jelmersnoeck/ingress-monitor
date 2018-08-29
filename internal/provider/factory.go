@@ -11,7 +11,7 @@ var defaultProviderFactory = newFactory()
 
 // ErrProviderNotFound is an error which is used when we try to create a new
 // client for a given provider which isn't registered with the factory.
-var ErrProviderNotFound = errors.New("The specified provider can't be found.")
+var ErrProviderNotFound = errors.New("the specified provider can't be found")
 
 // FactoryFunc is the interface used to allow creating a new provider. This
 // shoud be used by provider wrappers to allow for creating new clients.

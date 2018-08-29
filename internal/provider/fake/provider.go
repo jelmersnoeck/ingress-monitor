@@ -7,18 +7,18 @@ import (
 
 // SimpleProvider represents a provider which is useful for testing purposes.
 type SimpleProvider struct {
-	CreateFunc  func(v1alpha1.MonitorTemplate) (string, error)
+	CreateFunc  func(v1alpha1.MonitorTemplateSpec) (string, error)
 	CreateCount int
 
 	DeleteFunc  func(string) error
 	DeleteCount int
 
-	UpdateFunc  func(string, v1alpha1.MonitorTemplate) error
+	UpdateFunc  func(string, v1alpha1.MonitorTemplateSpec) error
 	UpdateCount int
 }
 
 // Create calls the specified CreateFunc in the SimpleProvider.
-func (fp *SimpleProvider) Create(im v1alpha1.MonitorTemplate) (string, error) {
+func (fp *SimpleProvider) Create(im v1alpha1.MonitorTemplateSpec) (string, error) {
 	fp.CreateCount++
 	return fp.CreateFunc(im)
 }
@@ -30,7 +30,7 @@ func (fp *SimpleProvider) Delete(id string) error {
 }
 
 // Update calls the specified UpdateFunc in the SimpleProvider.
-func (fp *SimpleProvider) Update(id string, im v1alpha1.MonitorTemplate) error {
+func (fp *SimpleProvider) Update(id string, im v1alpha1.MonitorTemplateSpec) error {
 	fp.UpdateCount++
 	return fp.UpdateFunc(id, im)
 }

@@ -42,6 +42,10 @@ func (c *FakeIngressmonitorV1alpha1) Monitors(namespace string) v1alpha1.Monitor
 	return &FakeMonitors{c, namespace}
 }
 
+func (c *FakeIngressmonitorV1alpha1) MonitorTemplates(namespace string) v1alpha1.MonitorTemplateInterface {
+	return &FakeMonitorTemplates{c, namespace}
+}
+
 func (c *FakeIngressmonitorV1alpha1) Providers(namespace string) v1alpha1.ProviderInterface {
 	return &FakeProviders{c, namespace}
 }

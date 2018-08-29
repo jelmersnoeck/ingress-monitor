@@ -11,7 +11,7 @@ type IngressMonitorSpec struct {
 	Provider ProviderSpec `json:"provider"`
 
 	// Template describes the monitor configuration.
-	Template MonitorTemplate `json:"template"`
+	Template MonitorTemplateSpec `json:"template"`
 }
 
 // IngressMonitorStatus describes the status of an IngressMonitor. This is data

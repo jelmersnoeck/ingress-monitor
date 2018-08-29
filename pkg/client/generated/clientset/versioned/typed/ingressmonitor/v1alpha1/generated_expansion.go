@@ -28,4 +28,6 @@ type IngressMonitorExpansion interface{}
 
 type MonitorExpansion interface{}
 
+type MonitorTemplateExpansion interface{}
+
 type ProviderExpansion interface{}

@@ -35,6 +35,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Monitor{},
 		&MonitorList{},
+		&MonitorTemplate{},
+		&MonitorTemplateList{},
 		&Provider{},
 		&ProviderList{},
 		&IngressMonitor{},

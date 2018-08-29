@@ -63,6 +63,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Ingressmonitor().V1alpha1().IngressMonitors().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("monitors"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Ingressmonitor().V1alpha1().Monitors().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("monitortemplates"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Ingressmonitor().V1alpha1().MonitorTemplates().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("providers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Ingressmonitor().V1alpha1().Providers().Informer()}, nil
 

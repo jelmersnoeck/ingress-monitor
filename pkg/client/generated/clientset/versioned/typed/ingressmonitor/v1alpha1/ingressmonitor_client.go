@@ -35,6 +35,7 @@ type IngressmonitorV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	IngressMonitorsGetter
 	MonitorsGetter
+	MonitorTemplatesGetter
 	ProvidersGetter
 }
 
@@ -49,6 +50,10 @@ func (c *IngressmonitorV1alpha1Client) IngressMonitors(namespace string) Ingress
 
 func (c *IngressmonitorV1alpha1Client) Monitors(namespace string) MonitorInterface {
 	return newMonitors(c, namespace)
+}
+
+func (c *IngressmonitorV1alpha1Client) MonitorTemplates(namespace string) MonitorTemplateInterface {
+	return newMonitorTemplates(c, namespace)
 }
 
 func (c *IngressmonitorV1alpha1Client) Providers(namespace string) ProviderInterface {

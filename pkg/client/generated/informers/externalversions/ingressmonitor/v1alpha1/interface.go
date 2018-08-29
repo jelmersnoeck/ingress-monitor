@@ -34,6 +34,8 @@ type Interface interface {
 	IngressMonitors() IngressMonitorInformer
 	// Monitors returns a MonitorInformer.
 	Monitors() MonitorInformer
+	// MonitorTemplates returns a MonitorTemplateInformer.
+	MonitorTemplates() MonitorTemplateInformer
 	// Providers returns a ProviderInformer.
 	Providers() ProviderInformer
 }
@@ -57,6 +59,11 @@ func (v *version) IngressMonitors() IngressMonitorInformer {
 // Monitors returns a MonitorInformer.
 func (v *version) Monitors() MonitorInformer {
 	return &monitorInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// MonitorTemplates returns a MonitorTemplateInformer.
+func (v *version) MonitorTemplates() MonitorTemplateInformer {
+	return &monitorTemplateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Providers returns a ProviderInformer.

@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -37,8 +36,7 @@ type Operator struct {
 	kubeClient kubernetes.Interface
 	imClient   versioned.Interface
 
-	imInformer  externalversions.SharedInformerFactory
-	ingInformer informers.SharedInformerFactory
+	imInformer externalversions.SharedInformerFactory
 }
 
 // NewOperator sets up a new IngressMonitor Operator which will watch for
@@ -55,14 +53,12 @@ func NewOperator(
 		kubeClient: kc,
 		imClient:   imc,
 
-		imInformer:  externalversions.NewSharedInformerFactory(imc, resync),
-		ingInformer: informers.NewSharedInformerFactory(kc, resync),
+		imInformer: externalversions.NewSharedInformerFactory(imc, resync),
 	}
 
 	// Add EventHandlers for all objects we want to track
 	op.imInformer.Ingressmonitor().V1alpha1().Monitors().Informer().AddEventHandler(op)
 	op.imInformer.Ingressmonitor().V1alpha1().Providers().Informer().AddEventHandler(op)
-	op.ingInformer.Extensions().V1beta1().Ingresses().Informer().AddEventHandler(op)
 
 	return op, nil
 }
@@ -73,7 +69,6 @@ func (o *Operator) Run(stopCh <-chan struct{}) error {
 
 	log.Printf("Starting the informers")
 	o.imInformer.Start(stopCh)
-	o.ingInformer.Start(stopCh)
 
 	<-stopCh
 	log.Printf("Stopping IngressMonitor Operator")

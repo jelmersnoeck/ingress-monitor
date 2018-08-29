@@ -3,8 +3,27 @@ services:
 - docker
 go:
 - 1.11.x
+cache:
+- directories:
+  - "$GOPATH/bin"
+before_install:
+- curl -o- https://raw.githubusercontent.com/manifoldco/manifold-cli/master/install.sh
+  | bash
+- export PATH=$PATH:$HOME/.manifold/bin/
 install: make bootstrap
 branches:
   only:
   - master
   - "/^v([0-9]+)\\.([0-9]+)\\.([0-9]+)(?:\\-(rc\\.[0-9]+)*)?$/"
+deploy:
+- provider: script
+  script: manifold run -- make release
+  skip_cleanup: true
+  on:
+    branch: master
+    tags: true
+env:
+  global:
+  - MANIFOLD_TEAM=siphoc
+  - MANIFOLD_PROJECT=ingress-monitor
+  - secure: BYtL1CI/CoKEobqG0wQIx39eGiVBX/XUf19stgl+5Bh0N4WytTjFKygxjW49oZnTdcqOX/FGsp6MKTwr+nppgAbBEW514bxlsyDapnW/8Mb1dVvNJO8nOmtRjQqCYdM7Yr/rCs3e9oHAECSTEvvbzsj55vP86vSdqjCUDr/hyveayGSWPpcc9N3Pm9D6L90dXMp+2oxqMIbKQRMWBJw7EJrtdvUlye4BXTwy/y23FfH7jjhT+S/UUW2kGUcui+RXBKqnK8lvVlkZRrNuK9hiixW1l1zM2RF2+qWBBW0OZhORzGxsvVBOd1oOQ34sNryjIo48LBblbX/aTzrZnKSBJ7Di2l9FZm4eBdrRb1QZUpQVjbC1XFQDEiaLCXa+3kEGK5n1jw4aUSidZ3lfnzkhz76cQOB/AYsTaPlF39oZO0P3JIW2j2X4dahjCfV5pQWqsO23PYTH4M1ZpipMMtp6LX2BTCldtRtnaWzyaiP7HQRrUId9qKcnGIxJ+c21C281Pc6ykVEY3XsNFhNiLbZ4hoW/dy/oi4dcflgEeeOKir5Jcu5J4+GsNPGCbAXkGDa3wHzt340gahWbpaV4EDP2aUDCzVwFy6BZiagNev3NQBF4cH/mx/QgJTZhNpSNddU1UlTVvDnqG6RgelRYlEoQ2b4T/Y4ftaPWPv6DORTsMiM=

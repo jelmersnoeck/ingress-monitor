@@ -36,7 +36,7 @@ import (
 // MonitorTemplatesGetter has a method to return a MonitorTemplateInterface.
 // A group's client should implement this interface.
 type MonitorTemplatesGetter interface {
-	MonitorTemplates(namespace string) MonitorTemplateInterface
+	MonitorTemplates() MonitorTemplateInterface
 }
 
 // MonitorTemplateInterface has methods to work with MonitorTemplate resources.
@@ -55,14 +55,12 @@ type MonitorTemplateInterface interface {
 // monitorTemplates implements MonitorTemplateInterface
 type monitorTemplates struct {
 	client rest.Interface
-	ns     string
 }
 
 // newMonitorTemplates returns a MonitorTemplates
-func newMonitorTemplates(c *IngressmonitorV1alpha1Client, namespace string) *monitorTemplates {
+func newMonitorTemplates(c *IngressmonitorV1alpha1Client) *monitorTemplates {
 	return &monitorTemplates{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -70,7 +68,6 @@ func newMonitorTemplates(c *IngressmonitorV1alpha1Client, namespace string) *mon
 func (c *monitorTemplates) Get(name string, options v1.GetOptions) (result *v1alpha1.MonitorTemplate, err error) {
 	result = &v1alpha1.MonitorTemplate{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("monitortemplates").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -83,7 +80,6 @@ func (c *monitorTemplates) Get(name string, options v1.GetOptions) (result *v1al
 func (c *monitorTemplates) List(opts v1.ListOptions) (result *v1alpha1.MonitorTemplateList, err error) {
 	result = &v1alpha1.MonitorTemplateList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("monitortemplates").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
@@ -95,7 +91,6 @@ func (c *monitorTemplates) List(opts v1.ListOptions) (result *v1alpha1.MonitorTe
 func (c *monitorTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("monitortemplates").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
@@ -105,7 +100,6 @@ func (c *monitorTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
 func (c *monitorTemplates) Create(monitorTemplate *v1alpha1.MonitorTemplate) (result *v1alpha1.MonitorTemplate, err error) {
 	result = &v1alpha1.MonitorTemplate{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("monitortemplates").
 		Body(monitorTemplate).
 		Do().
@@ -117,7 +111,6 @@ func (c *monitorTemplates) Create(monitorTemplate *v1alpha1.MonitorTemplate) (re
 func (c *monitorTemplates) Update(monitorTemplate *v1alpha1.MonitorTemplate) (result *v1alpha1.MonitorTemplate, err error) {
 	result = &v1alpha1.MonitorTemplate{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("monitortemplates").
 		Name(monitorTemplate.Name).
 		Body(monitorTemplate).
@@ -129,7 +122,6 @@ func (c *monitorTemplates) Update(monitorTemplate *v1alpha1.MonitorTemplate) (re
 // Delete takes name of the monitorTemplate and deletes it. Returns an error if one occurs.
 func (c *monitorTemplates) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("monitortemplates").
 		Name(name).
 		Body(options).
@@ -140,7 +132,6 @@ func (c *monitorTemplates) Delete(name string, options *v1.DeleteOptions) error 
 // DeleteCollection deletes a collection of objects.
 func (c *monitorTemplates) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("monitortemplates").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
@@ -152,7 +143,6 @@ func (c *monitorTemplates) DeleteCollection(options *v1.DeleteOptions, listOptio
 func (c *monitorTemplates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.MonitorTemplate, err error) {
 	result = &v1alpha1.MonitorTemplate{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("monitortemplates").
 		SubResource(subresources...).
 		Name(name).

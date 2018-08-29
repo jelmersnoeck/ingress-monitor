@@ -47,33 +47,32 @@ type MonitorTemplateInformer interface {
 type monitorTemplateInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
-	namespace        string
 }
 
 // NewMonitorTemplateInformer constructs a new informer for MonitorTemplate type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewMonitorTemplateInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredMonitorTemplateInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewMonitorTemplateInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredMonitorTemplateInformer(client, resyncPeriod, indexers, nil)
 }
 
 // NewFilteredMonitorTemplateInformer constructs a new informer for MonitorTemplate type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredMonitorTemplateInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredMonitorTemplateInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.IngressmonitorV1alpha1().MonitorTemplates(namespace).List(options)
+				return client.IngressmonitorV1alpha1().MonitorTemplates().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.IngressmonitorV1alpha1().MonitorTemplates(namespace).Watch(options)
+				return client.IngressmonitorV1alpha1().MonitorTemplates().Watch(options)
 			},
 		},
 		&ingressmonitorv1alpha1.MonitorTemplate{},
@@ -83,7 +82,7 @@ func NewFilteredMonitorTemplateInformer(client versioned.Interface, namespace st
 }
 
 func (f *monitorTemplateInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredMonitorTemplateInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredMonitorTemplateInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *monitorTemplateInformer) Informer() cache.SharedIndexInformer {

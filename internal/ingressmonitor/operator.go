@@ -223,14 +223,14 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 	}
 
 	// fetch the referenced provider
-	prov, err := o.imClient.Ingressmonitor().Providers(obj.Namespace).
+	prov, err := o.imClient.Ingressmonitor().Providers().
 		Get(obj.Spec.Provider.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
 	// fetch the referenced template
-	tmpl, err := o.imClient.Ingressmonitor().MonitorTemplates(obj.Namespace).
+	tmpl, err := o.imClient.Ingressmonitor().MonitorTemplates().
 		Get(obj.Spec.Template.Name, metav1.GetOptions{})
 	if err != nil {
 		return err

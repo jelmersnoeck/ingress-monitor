@@ -52,12 +52,12 @@ func (c *IngressmonitorV1alpha1Client) Monitors(namespace string) MonitorInterfa
 	return newMonitors(c, namespace)
 }
 
-func (c *IngressmonitorV1alpha1Client) MonitorTemplates(namespace string) MonitorTemplateInterface {
-	return newMonitorTemplates(c, namespace)
+func (c *IngressmonitorV1alpha1Client) MonitorTemplates() MonitorTemplateInterface {
+	return newMonitorTemplates(c)
 }
 
-func (c *IngressmonitorV1alpha1Client) Providers(namespace string) ProviderInterface {
-	return newProviders(c, namespace)
+func (c *IngressmonitorV1alpha1Client) Providers() ProviderInterface {
+	return newProviders(c)
 }
 
 // NewForConfig creates a new IngressmonitorV1alpha1Client for the given config.

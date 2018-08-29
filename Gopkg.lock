@@ -10,6 +10,14 @@
   version = "v1.1.1"
 
 [[projects]]
+  digest = "1:c2b25f10f8453e47cab40b91198852256c182df8b976a96cae5faa34683e0fd2"
+  name = "github.com/dchest/blake2b"
+  packages = ["."]
+  pruneopts = ""
+  revision = "06006a921c7d13e3fdf63c401cb0e4529a26e6e4"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:eb53021a8aa3f599d29c7102e65026242bdedce998a54837dc67f14b6a97c5fd"
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
@@ -628,6 +636,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/dchest/blake2b",
     "github.com/golang/glog",
     "github.com/spf13/cobra",
     "github.com/spf13/viper",

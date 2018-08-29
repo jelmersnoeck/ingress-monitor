@@ -1,5 +1,7 @@
 # Ingress Monitor
 
+[![Build Status](https://travis-ci.org/jelmersnoeck/ingress-monitor.svg?branch=master)](https://travis-ci.org/jelmersnoeck/ingress-monitor)
+
 Ingress Monitor is a Kubernetes Operator which takes care of setting up
 monitoring for your Kubernetes Ingress and Service objects.
 

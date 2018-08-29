@@ -58,7 +58,7 @@ func NewOperator(
 
 	// Add EventHandlers for all objects we want to track
 	op.imInformer.Ingressmonitor().V1alpha1().Monitors().Informer().AddEventHandler(op)
-	op.imInformer.Ingressmonitor().V1alpha1().Providers().Informer().AddEventHandler(op)
+	op.imInformer.Ingressmonitor().V1alpha1().IngressMonitors().Informer().AddEventHandler(op)
 
 	return op, nil
 }

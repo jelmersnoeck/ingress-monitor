@@ -81,29 +81,8 @@ func (o *Operator) Run(stopCh <-chan struct{}) error {
 func (o *Operator) OnAdd(obj interface{}) {
 	switch obj := obj.(type) {
 	case *v1alpha1.IngressMonitor:
-		// This object has an ID so it's already been configured. We could be in
-		// a restart cycle. The OnUpdate handler will take care in a resync to
-		// update the checks to the latest.
-		if obj.Status.ID != "" {
-			return
-		}
-
-		cl, err := provider.From(obj.Spec.Provider)
-		if err != nil {
-			log.Printf("Could not get provider for IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
-			return
-		}
-
-		id, err := cl.Create(obj.Spec.Template)
-		if err != nil {
-			log.Printf("Could not create IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
-			return
-		}
-
-		obj.Status.ID = id
-		if _, err := o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).Update(obj); err != nil {
-			log.Printf("Could not update IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
-			return
+		if err := o.handleIngressMonitor(obj); err != nil {
+			log.Printf("Error adding IngressMonitor: %s", err)
 		}
 	case *v1alpha1.Monitor:
 		if err := o.handleMonitor(obj); err != nil {
@@ -117,15 +96,8 @@ func (o *Operator) OnAdd(obj interface{}) {
 func (o *Operator) OnUpdate(old, new interface{}) {
 	switch obj := new.(type) {
 	case *v1alpha1.IngressMonitor:
-		cl, err := provider.From(obj.Spec.Provider)
-		if err != nil {
-			log.Printf("Could not get provider for IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
-			return
-		}
-
-		if err := cl.Update(obj.Status.ID, obj.Spec.Template); err != nil {
-			log.Printf("Could not update IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
-			return
+		if err := o.handleIngressMonitor(obj); err != nil {
+			log.Printf("Error updating IngressMonitor: %s", err)
 		}
 	case *v1alpha1.Monitor:
 		// GC old objects, we do this on every run - even resyncs - so we can be
@@ -155,6 +127,30 @@ func (o *Operator) OnDelete(obj interface{}) {
 			return
 		}
 	}
+}
+
+// handleIngressMonitor handles IngressMonitors in a way that it knows how to
+// deal with creating and updating resources.
+func (o *Operator) handleIngressMonitor(obj *v1alpha1.IngressMonitor) error {
+	cl, err := provider.From(obj.Spec.Provider)
+	if err != nil {
+		return err
+	}
+
+	if obj.Status.ID != "" {
+		// This object hasn't been created yet, do so!
+		return cl.Update(obj.Status.ID, obj.Spec.Template)
+	}
+
+	id, err := cl.Create(obj.Spec.Template)
+	if err != nil {
+		return err
+	}
+
+	obj.Status.ID = id
+	_, err = o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).Update(obj)
+
+	return err
 }
 
 // garbgageCollectMonitors finds all IngressMonitors that are linked to a

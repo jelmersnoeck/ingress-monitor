@@ -5,6 +5,11 @@
 Ingress Monitor is a Kubernetes Operator which takes care of setting up
 monitoring for your Kubernetes Ingress and Service objects.
 
+## Status
+
+This is still a WIP. Currently resource syncs are not entirely implemented and
+no provider mappings have been implemented.
+
 ## Supported Providers
 
 Providers are used to indicate where we want to set up a monitor. Multiple

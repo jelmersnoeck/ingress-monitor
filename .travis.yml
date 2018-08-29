@@ -15,8 +15,13 @@ branches:
   only:
   - master
   - "/^v([0-9]+)\\.([0-9]+)\\.([0-9]+)(?:\\-(rc\\.[0-9]+)*)?$/"
-script:
-- manifold run -- make ci
+deploy:
+- provider: script
+  script: manifold run -- make release
+  skip_cleanup: true
+  on:
+    branch: master
+    tags: true
 env:
   global:
   - MANIFOLD_TEAM=siphoc

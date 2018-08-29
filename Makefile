@@ -1,7 +1,7 @@
 PKG=github.com/jelmersnoeck/ingress-monitor
 PKGS := $(shell go list ./... | grep -v generated)
 
-ci: bootstrap linters check-generated lint test
+ci: bootstrap linters check-generated lint test release
 
 #################################################
 # Bootstrapping for base golang package deps
@@ -137,5 +137,21 @@ $(DOCKER_IMAGES:%=%-dev): docker-%-dev: build/docker/%/Dockerfile bin/%-dev
 
 docker: $(DOCKER_IMAGES)
 docker-dev: $(DOCKER_IMAGES:%=%-dev)
+
+docker-login:
+	docker login -u="$$DOCKER_USERNAME" -p="$$DOCKER_PASSWORD"
+
+$(DOCKER_RELEASES): release-%: docker-login docker-%
+	docker tag $(DOCKER_REPOSITORY)/$(patsubst release-%,%,$@) $(DOCKER_REPOSITORY)/$(patsubst release-%,%,$@):$(RELEASE_VERSION)
+	docker push $(DOCKER_REPOSITORY)/$(patsubst release-%,%,$@):$(RELEASE_VERSION)
+ifeq ($(VCS_BRANCH),$(BASE_BRANCH))
+	# On master, we want to push latest
+	docker push $(DOCKER_REPOSITORY)/$(patsubst release-%,%,$@):latest
+else
+	# On branches, we want to push specific branch version and latest branch
+	docker tag $(DOCKER_REPOSITORY)/$(patsubst release-%,%,$@) $(DOCKER_REPOSITORY)/$(patsubst release-%,%,$@):$(RELEASE_VERSION)
+	docker push $(DOCKER_REPOSITORY)/$(patsubst release-%,%,$@):$(RELEASE_VERSION)
+endif
+release: $(DOCKER_RELEASES)
 
 .PHONY: $(BINS:%=$(PREFIX)%) $(DOCKER_IMAGES) $(CMDs:%=build/docker/%/Dockerfile)

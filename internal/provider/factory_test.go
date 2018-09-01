@@ -10,8 +10,9 @@ import (
 )
 
 func TestProviderFactory(t *testing.T) {
+	fact := provider.NewFactory(nil)
 	reset := func() {
-		provider.DefaultFactory().Flush()
+		fact = provider.NewFactory(nil)
 	}
 
 	t.Run("with registered provider", func(t *testing.T) {
@@ -19,9 +20,9 @@ func TestProviderFactory(t *testing.T) {
 
 		prov := new(fake.SimpleProvider)
 
-		provider.Register("simple", fake.FactoryFunc(prov))
+		fact.Register("simple", fake.FactoryFunc(prov))
 
-		cl, err := provider.From(v1alpha1.NamespacedProvider{
+		cl, err := fact.From(v1alpha1.NamespacedProvider{
 			ProviderSpec: v1alpha1.ProviderSpec{
 				Type: "simple",
 			},
@@ -39,7 +40,7 @@ func TestProviderFactory(t *testing.T) {
 	t.Run("without registered provider", func(t *testing.T) {
 		defer reset()
 
-		_, err := provider.DefaultFactory().From(v1alpha1.NamespacedProvider{
+		_, err := fact.From(v1alpha1.NamespacedProvider{
 			ProviderSpec: v1alpha1.ProviderSpec{
 				Type: "simple",
 			},

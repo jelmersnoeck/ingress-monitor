@@ -5,9 +5,8 @@ import (
 	"sync"
 
 	"github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
+	"k8s.io/client-go/kubernetes"
 )
-
-var defaultProviderFactory = newFactory()
 
 // ErrProviderNotFound is an error which is used when we try to create a new
 // client for a given provider which isn't registered with the factory.
@@ -15,7 +14,7 @@ var ErrProviderNotFound = errors.New("the specified provider can't be found")
 
 // FactoryFunc is the interface used to allow creating a new provider. This
 // shoud be used by provider wrappers to allow for creating new clients.
-type FactoryFunc func(v1alpha1.NamespacedProvider) (Interface, error)
+type FactoryFunc func(kubernetes.Interface, v1alpha1.NamespacedProvider) (Interface, error)
 
 // FactoryInterface is the interface used for a ProviderFactory. It allows you
 // to fetch providers from a local store and use them to configure monitors.
@@ -24,21 +23,11 @@ type FactoryInterface interface {
 	From(v1alpha1.NamespacedProvider) (Interface, error)
 }
 
-// Register registers a provider which can be used from within the Factory to
-// create new Monitors.
-func Register(name string, ff FactoryFunc) {
-	defaultProviderFactory.Register(name, ff)
-}
-
-// From returns a provider from the given NamespacedProvider.
-func From(prov v1alpha1.NamespacedProvider) (Interface, error) {
-	return defaultProviderFactory.From(prov)
-}
-
 // SimpleFactory is a factory object that knows how to get providers.
 type SimpleFactory struct {
 	providers map[string]FactoryFunc
 	lock      sync.RWMutex
+	client    kubernetes.Interface
 }
 
 // Register registers the given provider with the factory under the given name.
@@ -60,24 +49,14 @@ func (pf *SimpleFactory) From(prov v1alpha1.NamespacedProvider) (Interface, erro
 		return nil, ErrProviderNotFound
 	}
 
-	return pr(prov)
+	return pr(pf.client, prov)
 }
 
-// Flush resets all FactoryFuncs
-func (pf *SimpleFactory) Flush() {
-	pf.lock.Lock()
-	defer pf.lock.Unlock()
-
-	pf.providers = map[string]FactoryFunc{}
-}
-
-func newFactory() *SimpleFactory {
+// NewFactory returns a new SimpleFactory which is able to register a set of
+// Providers and create clients for them.
+func NewFactory(client kubernetes.Interface) *SimpleFactory {
 	return &SimpleFactory{
+		client:    client,
 		providers: map[string]FactoryFunc{},
 	}
-}
-
-// DefaultFactory returns the DefaultFactory.
-func DefaultFactory() *SimpleFactory {
-	return defaultProviderFactory
 }

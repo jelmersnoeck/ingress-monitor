@@ -36,7 +36,8 @@ type Operator struct {
 	kubeClient kubernetes.Interface
 	imClient   versioned.Interface
 
-	imInformer externalversions.SharedInformerFactory
+	imInformer      externalversions.SharedInformerFactory
+	providerFactory provider.FactoryInterface
 }
 
 // NewOperator sets up a new IngressMonitor Operator which will watch for
@@ -50,10 +51,10 @@ func NewOperator(
 	crdscheme.AddToScheme(scheme.Scheme)
 
 	op := &Operator{
-		kubeClient: kc,
-		imClient:   imc,
-
-		imInformer: externalversions.NewSharedInformerFactory(imc, resync),
+		kubeClient:      kc,
+		imClient:        imc,
+		imInformer:      externalversions.NewSharedInformerFactory(imc, resync),
+		providerFactory: providerFactory,
 	}
 
 	// Add EventHandlers for all objects we want to track
@@ -116,7 +117,7 @@ func (o *Operator) OnUpdate(old, new interface{}) {
 func (o *Operator) OnDelete(obj interface{}) {
 	switch obj := obj.(type) {
 	case *v1alpha1.IngressMonitor:
-		cl, err := provider.From(obj.Spec.Provider)
+		cl, err := o.providerFactory.From(obj.Spec.Provider)
 		if err != nil {
 			log.Printf("Could not get provider for IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
 			return
@@ -132,7 +133,7 @@ func (o *Operator) OnDelete(obj interface{}) {
 // handleIngressMonitor handles IngressMonitors in a way that it knows how to
 // deal with creating and updating resources.
 func (o *Operator) handleIngressMonitor(obj *v1alpha1.IngressMonitor) error {
-	cl, err := provider.From(obj.Spec.Provider)
+	cl, err := o.providerFactory.From(obj.Spec.Provider)
 	if err != nil {
 		return err
 	}

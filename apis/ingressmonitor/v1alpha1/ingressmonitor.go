@@ -20,6 +20,9 @@ type IngressMonitorStatus struct {
 	// ID describes the ID of the monitor which is registered with the provider.
 	// This is used to update or delete the monitor with the provider.
 	ID string `json:"id"`
+
+	// IngressName is the name of the Ingress this IngressMonitor is linked to.
+	IngressName string `json:"ingressName"`
 }
 
 // NamespacedProvider contains all the details about a provider, including the

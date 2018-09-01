@@ -294,7 +294,8 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 			if templateSpec.HTTP.Endpoint != nil {
 				healthPath = *templateSpec.HTTP.Endpoint
 			}
-			templateSpec.HTTP.URL = fmt.Sprintf("%s%s%s", scheme, rule.Host, healthPath)
+			monitorURL := fmt.Sprintf("%s%s%s", scheme, rule.Host, healthPath)
+			templateSpec.HTTP.URL = monitorURL
 
 			im := &v1alpha1.IngressMonitor{
 				ObjectMeta: metav1.ObjectMeta{
@@ -336,6 +337,7 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 				im.ObjectMeta = gIM.ObjectMeta
 				im.TypeMeta = gIM.TypeMeta
 				im.Status = gIM.Status
+				im.Status.IngressName = ing.Name
 
 				_, err = o.imClient.Ingressmonitor().
 					IngressMonitors(im.Namespace).Update(im)

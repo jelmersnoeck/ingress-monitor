@@ -35,11 +35,11 @@ type StatusCakeProvider struct {
 type SecretVar struct {
 	// Optional: Specifies a plaintext value of
 	// +optional
-	Value string
+	Value *string `json:"value,omitempty"`
 
 	// Optional: Specifies a source the value of this var should come from.
 	// +optional
-	ValueFrom *v1.EnvVarSource
+	ValueFrom *v1.SecretKeySelector `json:"valueFrom,omitempty"`
 }
 
 // +genclient

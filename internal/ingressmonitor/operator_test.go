@@ -188,11 +188,11 @@ func TestOperator_OnUpdate_IngressMonitor(t *testing.T) {
 
 		err := errors.New("my-provider-error")
 		prov := new(fake.SimpleProvider)
-		prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) error {
+		prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) (string, error) {
 			if status != "12345" {
 				t.Errorf("Expected status to be `12345`, got `%s`", status)
 			}
-			return err
+			return status, err
 		}
 
 		fact.Register("simple", fake.FactoryFunc(prov))
@@ -227,11 +227,11 @@ func TestOperator_OnUpdate_IngressMonitor(t *testing.T) {
 		fact := provider.NewFactory(nil)
 
 		prov := new(fake.SimpleProvider)
-		prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) error {
+		prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) (string, error) {
 			if status != "12345" {
 				t.Errorf("Expected status to be `12345`, got `%s`", status)
 			}
-			return nil
+			return status, nil
 		}
 
 		fact.Register("simple", fake.FactoryFunc(prov))
@@ -484,6 +484,12 @@ func Test_OnAdd_Monitor(t *testing.T) {
 					Name:      "test-template",
 					Namespace: "testing",
 				},
+				Spec: v1alpha1.MonitorTemplateSpec{
+					Type: "HTTP",
+					HTTP: &v1alpha1.HTTPTemplate{
+						Endpoint: ptrString("/_healthz"),
+					},
+				},
 			}
 
 			crdClient := imfake.NewSimpleClientset(prov, tmpl)
@@ -537,6 +543,10 @@ func Test_OnAdd_Monitor(t *testing.T) {
 				},
 				Spec: v1alpha1.MonitorTemplateSpec{
 					Name: "some-test-{{.IngressName}}-{{.IngressNamespace}}",
+					Type: "HTTP",
+					HTTP: &v1alpha1.HTTPTemplate{
+						Endpoint: ptrString("/_healthz"),
+					},
 				},
 			}
 
@@ -582,6 +592,93 @@ func Test_OnAdd_Monitor(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("it should set up values correctly", func(t *testing.T) {
+		ing := &v1beta1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-ingress",
+				Namespace: "testing",
+				Labels: map[string]string{
+					"team": "gophers",
+				},
+			},
+			Spec: v1beta1.IngressSpec{
+				TLS: []v1beta1.IngressTLS{
+					{
+						Hosts: []string{
+							"test-host.sphc.io",
+						},
+					},
+				},
+				Rules: []v1beta1.IngressRule{
+					{Host: "test-host.sphc.io"},
+				},
+			},
+		}
+
+		k8sClient := k8sfake.NewSimpleClientset(ing)
+
+		prov := &v1alpha1.Provider{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-provider",
+				Namespace: "testing",
+			},
+		}
+
+		tmpl := &v1alpha1.MonitorTemplate{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-template",
+				Namespace: "testing",
+			},
+			Spec: v1alpha1.MonitorTemplateSpec{
+				Type: "HTTP",
+				HTTP: &v1alpha1.HTTPTemplate{
+					Endpoint: ptrString("/_healthz"),
+				},
+			},
+		}
+
+		crdClient := imfake.NewSimpleClientset(prov, tmpl)
+		op, _ := NewOperator(k8sClient, crdClient, v1.NamespaceAll, time.Minute, provider.NewFactory(nil))
+
+		mon := &v1alpha1.Monitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-monitor",
+				Namespace: "testing",
+			},
+			Spec: v1alpha1.MonitorSpec{
+				Selector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"team": "gophers",
+					},
+				},
+				Provider: v1.LocalObjectReference{
+					Name: "test-provider",
+				},
+				Template: v1.LocalObjectReference{
+					Name: "test-template",
+				},
+			},
+		}
+
+		op.OnAdd(mon)
+
+		imList, err := crdClient.Ingressmonitor().IngressMonitors(mon.Namespace).
+			List(metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("Could not get IngressMonitor List: %s", err)
+		}
+
+		if len(imList.Items) != 1 {
+			t.Errorf("Expected 1 IngressMonitor, got %d", len(imList.Items))
+		}
+
+		im := imList.Items[0]
+		expURL := "https://test-host.sphc.io/_healthz"
+		if url := im.Spec.Template.HTTP.URL; url != expURL {
+			t.Errorf("Expected URL to be `%s`, got `%s`", expURL, url)
+		}
+	})
 }
 
 func Test_OnUpdate_Monitor(t *testing.T) {
@@ -625,6 +722,10 @@ func Test_OnUpdate_Monitor(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-template",
 			Namespace: "testing",
+		},
+		Spec: v1alpha1.MonitorTemplateSpec{
+			Type: "HTTP",
+			HTTP: &v1alpha1.HTTPTemplate{},
 		},
 	}
 
@@ -789,4 +890,8 @@ func Test_OnUpdate_Monitor(t *testing.T) {
 			}
 		})
 	})
+}
+
+func ptrString(s string) *string {
+	return &s
 }

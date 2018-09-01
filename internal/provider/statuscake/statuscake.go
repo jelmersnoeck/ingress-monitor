@@ -1,12 +1,14 @@
 package statuscake
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/DreamItGetIT/statuscake"
@@ -20,7 +22,20 @@ func Register(fact provider.FactoryInterface) {
 // FactoryFunc is the function which will allow us to create clients on the fly
 // which connect to StatusCake.
 func FactoryFunc(k8sClient kubernetes.Interface, prov v1alpha1.NamespacedProvider) (provider.Interface, error) {
-	auth := statuscake.Auth{}
+	username, err := getSecretValue(k8sClient, prov.Namespace, prov.StatusCake.Username)
+	if err != nil {
+		return nil, err
+	}
+
+	apiKey, err := getSecretValue(k8sClient, prov.Namespace, prov.StatusCake.APIKey)
+	if err != nil {
+		return nil, err
+	}
+
+	auth := statuscake.Auth{
+		Username: username,
+		Apikey:   apiKey,
+	}
 	cl, err := statuscake.New(auth)
 	if err != nil {
 		return nil, err
@@ -30,6 +45,24 @@ func FactoryFunc(k8sClient kubernetes.Interface, prov v1alpha1.NamespacedProvide
 		cl:     cl.Tests(),
 		groups: prov.StatusCake.ContactGroups,
 	}, nil
+}
+
+func getSecretValue(cl kubernetes.Interface, ns string, env v1alpha1.SecretVar) (string, error) {
+	if env.Value != nil {
+		return *env.Value, nil
+	}
+
+	secret, err := cl.Core().Secrets(ns).Get(env.ValueFrom.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	data, ok := secret.Data[env.ValueFrom.Key]
+	if !ok {
+		return "", fmt.Errorf("Secret %s for `%s` not found", env.ValueFrom.Key, env.ValueFrom.Name)
+	}
+
+	return string(data), nil
 }
 
 type statusCakeClient interface {
@@ -72,20 +105,38 @@ func (c *Client) Delete(id string) error {
 }
 
 // Update updates the Monitor linked to the given ID with the new configuration.
-func (c *Client) Update(id string, spec v1alpha1.MonitorTemplateSpec) error {
+func (c *Client) Update(id string, spec v1alpha1.MonitorTemplateSpec) (string, error) {
 	iid, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	translation, err := c.translateSpec(spec)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	translation.TestID = int(iid)
-	_, err = c.cl.Update(translation)
-	return err
+	sct, err := c.cl.Update(translation)
+
+	if err != nil && err.Error() == fmt.Sprintf("No matching key can be found on this account. Given: %s", id) {
+		// XXX see if the API returns a 404 HTTP StatusCode, if so, we should add
+		// our own client to add proper error handling. This will do for now.
+		translation.TestID = 0
+		sct, err = c.cl.Update(translation)
+	} else if err != nil && err.Error() == fmt.Sprintf("No data has been updated (is any data different?) Given: %s", id) {
+		// XXX see if we get a proper status code back for this kind of error,
+		// it's not really an error.
+		// We want to keep doing these calls to ensure that the monitor is how
+		// it should be configured in our specs.
+		return id, nil
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	return strconv.Itoa(sct.TestID), nil
 }
 
 // translateSpec does the actual translation from a MonitorTemplateSpec to a

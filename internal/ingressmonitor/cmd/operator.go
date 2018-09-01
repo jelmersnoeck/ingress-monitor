@@ -53,7 +53,7 @@ func runOperator(cmd *cobra.Command, args []string) {
 		log.Fatalf("Error building IngressMonitor clientset: %s", err)
 	}
 
-	fact := provider.NewFactory(nil)
+	fact := provider.NewFactory(kubeClient)
 	statuscake.Register(fact)
 
 	op, err := ingressmonitor.NewOperator(

@@ -155,18 +155,22 @@ func (o *Operator) handleIngressMonitor(obj *v1alpha1.IngressMonitor) error {
 		return err
 	}
 
+	var id string
 	if obj.Status.ID != "" {
 		// This object hasn't been created yet, do so!
-		return cl.Update(obj.Status.ID, obj.Spec.Template)
+		id, err = cl.Update(obj.Status.ID, obj.Spec.Template)
+	} else {
+		id, err = cl.Create(obj.Spec.Template)
 	}
 
-	id, err := cl.Create(obj.Spec.Template)
 	if err != nil {
 		return err
 	}
 
-	obj.Status.ID = id
-	_, err = o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).Update(obj)
+	if obj.Status.ID != id {
+		obj.Status.ID = id
+		_, err = o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).Update(obj)
+	}
 
 	return err
 }
@@ -274,6 +278,24 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 			}
 			templateSpec.Name = tplName
 
+			healthPath := "/_healthz"
+
+			scheme := "http://"
+		TLSLoop:
+			for _, tlsList := range ing.Spec.TLS {
+				for _, host := range tlsList.Hosts {
+					if host == rule.Host {
+						scheme = "https://"
+						break TLSLoop
+					}
+				}
+			}
+
+			if templateSpec.HTTP.Endpoint != nil {
+				healthPath = *templateSpec.HTTP.Endpoint
+			}
+			templateSpec.HTTP.URL = fmt.Sprintf("%s%s%s", scheme, rule.Host, healthPath)
+
 			im := &v1alpha1.IngressMonitor{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -313,6 +335,7 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 			} else if err == nil {
 				im.ObjectMeta = gIM.ObjectMeta
 				im.TypeMeta = gIM.TypeMeta
+				im.Status = gIM.Status
 
 				_, err = o.imClient.Ingressmonitor().
 					IngressMonitors(im.Namespace).Update(im)

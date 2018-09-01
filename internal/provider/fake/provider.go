@@ -14,7 +14,7 @@ type SimpleProvider struct {
 	DeleteFunc  func(string) error
 	DeleteCount int
 
-	UpdateFunc  func(string, v1alpha1.MonitorTemplateSpec) error
+	UpdateFunc  func(string, v1alpha1.MonitorTemplateSpec) (string, error)
 	UpdateCount int
 }
 
@@ -31,7 +31,7 @@ func (fp *SimpleProvider) Delete(id string) error {
 }
 
 // Update calls the specified UpdateFunc in the SimpleProvider.
-func (fp *SimpleProvider) Update(id string, im v1alpha1.MonitorTemplateSpec) error {
+func (fp *SimpleProvider) Update(id string, im v1alpha1.MonitorTemplateSpec) (string, error) {
 	fp.UpdateCount++
 	return fp.UpdateFunc(id, im)
 }

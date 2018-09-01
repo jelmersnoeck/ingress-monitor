@@ -6,9 +6,114 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/DreamItGetIT/statuscake"
 	"github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
+
+	"github.com/DreamItGetIT/statuscake"
+
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
+
+func TestGetSecretVar(t *testing.T) {
+	t.Run("with plaintext value", func(t *testing.T) {
+		sv := v1alpha1.SecretVar{
+			Value: ptrString("plaintext"),
+		}
+
+		val, err := getSecretValue(nil, "", sv)
+		if err != nil {
+			t.Errorf("Expected no error, got %s", err)
+		}
+
+		if val != "plaintext" {
+			t.Errorf("Expected secret value to be `plaintext`, got `%s`", val)
+		}
+	})
+
+	t.Run("with reference value", func(t *testing.T) {
+		t.Run("with non existing secret", func(t *testing.T) {
+			k8s := fake.NewSimpleClientset()
+			sv := v1alpha1.SecretVar{
+				ValueFrom: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: "non-existing",
+					},
+				},
+			}
+
+			_, err := getSecretValue(k8s, "", sv)
+			if err == nil {
+				t.Errorf("Expected error, got none")
+			}
+		})
+
+		t.Run("with existing secret", func(t *testing.T) {
+			secret := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-secret",
+					Namespace: "testing",
+				},
+				Data: map[string][]byte{
+					"username": []byte("my-username"),
+				},
+			}
+			k8s := fake.NewSimpleClientset(secret)
+
+			t.Run("with non existing key", func(t *testing.T) {
+				sv := v1alpha1.SecretVar{
+					ValueFrom: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "test-secret",
+						},
+						Key: "non-existing",
+					},
+				}
+
+				_, err := getSecretValue(k8s, "testing", sv)
+				if err == nil {
+					t.Errorf("Expected error, got none")
+				}
+			})
+
+			t.Run("in the wrong namespace", func(t *testing.T) {
+				sv := v1alpha1.SecretVar{
+					ValueFrom: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "test-secret",
+						},
+						Key: "username",
+					},
+				}
+
+				_, err := getSecretValue(k8s, "wrong-namespace", sv)
+				if err == nil {
+					t.Errorf("Expected error, got none")
+				}
+			})
+
+			t.Run("with no errors", func(t *testing.T) {
+				sv := v1alpha1.SecretVar{
+					ValueFrom: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "test-secret",
+						},
+						Key: "username",
+					},
+				}
+
+				value, err := getSecretValue(k8s, "testing", sv)
+				if err != nil {
+					t.Fatalf("Expected no error, got %s", err)
+				}
+
+				if value != "my-username" {
+					t.Errorf("Expected username to be `my-username`, got `%s`", value)
+				}
+			})
+		})
+	})
+}
 
 func TestTranslateSpec(t *testing.T) {
 	tcs := []struct {
@@ -290,7 +395,7 @@ func TestClient_Update(t *testing.T) {
 			return sct, nil
 		}
 
-		if err := cl.Update("12345", tpl); err != nil {
+		if _, err := cl.Update("12345", tpl); err != nil {
 			t.Errorf("Expected no error, got %s", err)
 		}
 
@@ -312,7 +417,7 @@ func TestClient_Update(t *testing.T) {
 			},
 		}
 
-		if err := cl.Update("12345", tpl); err == nil {
+		if _, err := cl.Update("12345", tpl); err == nil {
 			t.Errorf("Expected error, got none")
 		}
 
@@ -338,7 +443,7 @@ func TestClient_Update(t *testing.T) {
 			return nil, scError
 		}
 
-		if err := cl.Update("12345", tpl); err != scError {
+		if _, err := cl.Update("12345", tpl); err != scError {
 			t.Errorf("Expected %s error, got %s", scError, err)
 		}
 

@@ -6,5 +6,5 @@ import "github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
 type Interface interface {
 	Create(v1alpha1.MonitorTemplateSpec) (string, error)
 	Delete(string) error
-	Update(string, v1alpha1.MonitorTemplateSpec) error
+	Update(string, v1alpha1.MonitorTemplateSpec) (string, error)
 }

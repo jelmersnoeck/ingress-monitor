@@ -86,11 +86,11 @@ func (o *Operator) OnAdd(obj interface{}) {
 	switch obj := obj.(type) {
 	case *v1alpha1.IngressMonitor:
 		if err := o.handleIngressMonitor(obj); err != nil {
-			log.Printf("Error adding IngressMonitor: %s", err)
+			log.Printf("Error adding IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
 		}
 	case *v1alpha1.Monitor:
 		if err := o.handleMonitor(obj); err != nil {
-			log.Printf("Error adding monitor to the cluster: %s", err)
+			log.Printf("Error adding Monitor %s:%s: %s", obj.Namespace, obj.Name, err)
 		}
 	}
 }
@@ -101,7 +101,7 @@ func (o *Operator) OnUpdate(old, new interface{}) {
 	switch obj := new.(type) {
 	case *v1alpha1.IngressMonitor:
 		if err := o.handleIngressMonitor(obj); err != nil {
-			log.Printf("Error updating IngressMonitor: %s", err)
+			log.Printf("Error updating IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
 		}
 	case *v1alpha1.Monitor:
 		// GC old objects, we do this on every run - even resyncs - so we can be
@@ -110,7 +110,7 @@ func (o *Operator) OnUpdate(old, new interface{}) {
 		o.garbageCollectMonitors(obj)
 
 		if err := o.handleMonitor(obj); err != nil {
-			log.Printf("Error updating monitor: %s", err)
+			log.Printf("Error updating Monitor %s:%s: %s", obj.Namespace, obj.Name, err)
 		}
 	}
 }
@@ -129,6 +129,20 @@ func (o *Operator) OnDelete(obj interface{}) {
 		if err := cl.Delete(obj.Status.ID); err != nil {
 			log.Printf("Could not delete IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
 			return
+		}
+	case *v1alpha1.Monitor:
+		imList, err := o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).
+			List(listOptions(map[string]string{monitorLabel: obj.Name}))
+		if err != nil {
+			log.Printf("Could not list IngressMonitors for Monitors %s:%s: %s", obj.Namespace, obj.Name, err)
+			return
+		}
+
+		for _, im := range imList.Items {
+			if err := o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).
+				Delete(im.Name, &metav1.DeleteOptions{}); err != nil {
+				log.Printf("Could not delete IngressMonitor %s for Monitors %s:%s: %s", im.Name, obj.Namespace, obj.Name, err)
+			}
 		}
 	}
 }
@@ -243,11 +257,15 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 	for _, ing := range ingressList.Items {
 		for _, rule := range ing.Spec.Rules {
 			name := fmt.Sprintf("%s-%s", ing.Name, shortHash(rule.Host, 16))
-			igRef := *metav1.NewControllerRef(
-				&ing,
-				extensions.SchemeGroupVersion.WithKind("Ingress"),
+
+			// we can only assign one reference that controls the object, ensure
+			// that it's the Ingress so that we can still perform garbage
+			// collection.
+			monitorReference := *metav1.NewControllerRef(
+				obj,
+				v1alpha1.SchemeGroupVersion.WithKind("Monitor"),
 			)
-			igRef.Controller = nil
+			monitorReference.Controller = nil
 
 			templateSpec := tmpl.Spec
 			tplName, err := templatedName(ing, templateSpec)
@@ -266,10 +284,10 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 					// have to set this up ourselves.
 					OwnerReferences: []metav1.OwnerReference{
 						*metav1.NewControllerRef(
-							obj,
-							v1alpha1.SchemeGroupVersion.WithKind("Monitor"),
+							&ing,
+							extensions.SchemeGroupVersion.WithKind("Ingress"),
 						),
-						igRef,
+						monitorReference,
 					},
 					// Set some labels so it's easier to filter later on
 					Labels: map[string]string{
@@ -287,10 +305,17 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 				},
 			}
 
-			_, err = o.imClient.Ingressmonitor().IngressMonitors(im.Namespace).Create(im)
-			if errors.IsAlreadyExists(err) {
-				_, err = o.imClient.Ingressmonitor().IngressMonitors(im.Namespace).
-					Update(im)
+			gIM, err := o.imClient.Ingressmonitor().IngressMonitors(im.Namespace).
+				Get(im.Name, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				_, err = o.imClient.Ingressmonitor().
+					IngressMonitors(im.Namespace).Create(im)
+			} else if err == nil {
+				im.ObjectMeta = gIM.ObjectMeta
+				im.TypeMeta = gIM.TypeMeta
+
+				_, err = o.imClient.Ingressmonitor().
+					IngressMonitors(im.Namespace).Update(im)
 			}
 
 			if err != nil {

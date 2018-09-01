@@ -10,6 +10,27 @@ monitoring for your Kubernetes Ingress and Service objects.
 This is still a WIP. The main piece currently missing is Custom Resource
 Definition validation and extra providers.
 
+## Usage
+
+IngressMonitor exists out of several key components, which are each explained
+in their respective [design docs](./docs/design).
+
+The main goal for Ingress Monitor is to make it easy for teams to set up
+monitors without having to add special annotations. As with a lot of the
+Kubernetes ecosystem, this operator bases it's selection on labels.
+
+This means that you can use your existing set of labels on your Ingresses and
+do a widespread selection, which will then be used by the Operator to set up
+the appropriate `IngressMonitor`. This is useful so that teams could for example
+each add their own label `team: gophers`, which then has a `Monitor` attached to
+it. This `Monitor` can then be configured to just alert this specific team if
+something is wrong.
+
+The second goal is to make it possible to reuse components. This is why there
+are separate `Provider` and `MonitorTemplate` objects. These can be mixed and
+matched within the `Monitor` resource, which then forms an actual monitoring
+instance.
+
 ## Installation
 
 To install the Operator, make sure you have RBAC enabled in your cluster.

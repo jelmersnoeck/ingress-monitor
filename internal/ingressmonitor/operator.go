@@ -244,7 +244,6 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 	prov, err := o.imClient.Ingressmonitor().Providers(obj.Namespace).
 		Get(obj.Spec.Provider.Name, metav1.GetOptions{})
 	if err != nil {
-		return err
 		return fmt.Errorf("Could not get Provider: %s", err)
 	}
 

@@ -66,6 +66,23 @@ spec:
   names:
     plural: ingressmonitors
     kind: IngressMonitor
+  additionalPrinterColumns:
+    - name: Provider
+      type: string
+      description: The provider this test is registered with
+      JSONPath: .spec.provider.type
+    - name: TestID
+      type: string
+      description: ID Used with the Provider
+      JSONPath: .status.id
+    - name: Ingress
+      type: string
+      description: The name of the Ingress this is linked to
+      JSONPath: .status.ingressName
+    - name: URL
+      type: string
+      description: The fully qualified URL to test
+      JSONPath: .spec.template.http.url
 
 ---
 

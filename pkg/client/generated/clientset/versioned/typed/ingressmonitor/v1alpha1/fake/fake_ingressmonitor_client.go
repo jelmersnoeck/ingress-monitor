@@ -46,8 +46,8 @@ func (c *FakeIngressmonitorV1alpha1) MonitorTemplates() v1alpha1.MonitorTemplate
 	return &FakeMonitorTemplates{c}
 }
 
-func (c *FakeIngressmonitorV1alpha1) Providers() v1alpha1.ProviderInterface {
-	return &FakeProviders{c}
+func (c *FakeIngressmonitorV1alpha1) Providers(namespace string) v1alpha1.ProviderInterface {
+	return &FakeProviders{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

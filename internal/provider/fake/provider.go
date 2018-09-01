@@ -3,6 +3,7 @@ package fake
 import (
 	"github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider"
+	"k8s.io/client-go/kubernetes"
 )
 
 // SimpleProvider represents a provider which is useful for testing purposes.
@@ -13,7 +14,7 @@ type SimpleProvider struct {
 	DeleteFunc  func(string) error
 	DeleteCount int
 
-	UpdateFunc  func(string, v1alpha1.MonitorTemplateSpec) error
+	UpdateFunc  func(string, v1alpha1.MonitorTemplateSpec) (string, error)
 	UpdateCount int
 }
 
@@ -30,7 +31,7 @@ func (fp *SimpleProvider) Delete(id string) error {
 }
 
 // Update calls the specified UpdateFunc in the SimpleProvider.
-func (fp *SimpleProvider) Update(id string, im v1alpha1.MonitorTemplateSpec) error {
+func (fp *SimpleProvider) Update(id string, im v1alpha1.MonitorTemplateSpec) (string, error) {
 	fp.UpdateCount++
 	return fp.UpdateFunc(id, im)
 }
@@ -38,7 +39,7 @@ func (fp *SimpleProvider) Update(id string, im v1alpha1.MonitorTemplateSpec) err
 // FactoryFunc is used to register the factory in a given test so we can use it
 // to test provider calls.
 func FactoryFunc(sp *SimpleProvider) provider.FactoryFunc {
-	return func(v1alpha1.ProviderSpec) (provider.Interface, error) {
+	return func(kubernetes.Interface, v1alpha1.NamespacedProvider) (provider.Interface, error) {
 		return sp, nil
 	}
 }

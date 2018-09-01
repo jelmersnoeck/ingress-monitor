@@ -1,0 +1,18 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: kuard
+  namespace: websites
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+  labels:
+    team: gophers
+spec:
+  rules:
+  - host: kuard.arigato.tools
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: kuard
+          servicePort: 8080

@@ -1,0 +1,16 @@
+apiVersion: ingressmonitor.sphc.io/v1alpha1
+kind: Provider
+metadata:
+  name: prod-gophers
+  namespace: websites
+spec:
+  type: StatusCake
+  statusCake:
+    username:
+      valueFrom:
+        name: statuscake-secrets
+        key: username
+    apiKey:
+      valueFrom:
+        name: statuscake-secrets
+        key: apikey

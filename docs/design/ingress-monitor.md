@@ -24,6 +24,9 @@ spec:
   # configuration which will be used to set up a client and configure the
   # template.
   provider:
+    # Optional. The namespace where to look for the secrets etc. If no namespace
+    # is given, the namespace of the IngressMonitor will be used.
+    namespace: websites
     # Required. The type of provider used to
     type: StatusCake
     # The statusCake provider implementation. This will be required if type is

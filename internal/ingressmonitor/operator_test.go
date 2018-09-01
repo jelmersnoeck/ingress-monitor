@@ -19,8 +19,10 @@ import (
 )
 
 func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
+
 	t.Run("without registered provider", func(t *testing.T) {
-		op, _ := NewOperator(nil, nil, "", time.Minute, provider.DefaultFactory())
+		fact := provider.NewFactory(nil)
+		op, _ := NewOperator(nil, nil, "", time.Minute, fact)
 
 		crd := &v1alpha1.IngressMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -28,8 +30,11 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "test",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "test",
+					},
 				},
 			},
 		}
@@ -38,7 +43,7 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 	})
 
 	t.Run("with error creating monitor", func(t *testing.T) {
-		defer provider.DefaultFactory().Flush()
+		fact := provider.NewFactory(nil)
 
 		err := errors.New("my-provider-error")
 		prov := new(fake.SimpleProvider)
@@ -46,9 +51,9 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 			return "", err
 		}
 
-		provider.Register("simple", fake.FactoryFunc(prov))
+		fact.Register("simple", fake.FactoryFunc(prov))
 
-		op, _ := NewOperator(nil, nil, "", time.Minute, provider.DefaultFactory())
+		op, _ := NewOperator(nil, nil, "", time.Minute, fact)
 
 		crd := &v1alpha1.IngressMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -56,8 +61,11 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "simple",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
 			},
 		}
@@ -70,14 +78,14 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 	})
 
 	t.Run("without errors", func(t *testing.T) {
-		defer provider.DefaultFactory().Flush()
+		fact := provider.NewFactory(nil)
 
 		prov := new(fake.SimpleProvider)
 		prov.CreateFunc = func(v1alpha1.MonitorTemplateSpec) (string, error) {
 			return "1234", nil
 		}
 
-		provider.Register("simple", fake.FactoryFunc(prov))
+		fact.Register("simple", fake.FactoryFunc(prov))
 
 		crd := &v1alpha1.IngressMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -85,13 +93,16 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "simple",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
 			},
 		}
 		crdClient := imfake.NewSimpleClientset(crd)
-		op, _ := NewOperator(nil, crdClient, "", time.Minute, provider.DefaultFactory())
+		op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
 
 		op.OnAdd(crd)
 
@@ -110,10 +121,11 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 	})
 
 	t.Run("with ID already set", func(t *testing.T) {
-		op, _ := NewOperator(nil, nil, "", time.Minute, provider.DefaultFactory())
+		fact := provider.NewFactory(nil)
+		op, _ := NewOperator(nil, nil, "", time.Minute, fact)
 
 		prov := new(fake.SimpleProvider)
-		provider.Register("simple", fake.FactoryFunc(prov))
+		fact.Register("simple", fake.FactoryFunc(prov))
 
 		crd := &v1alpha1.IngressMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -121,8 +133,11 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "test",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "test",
+					},
 				},
 			},
 			Status: v1alpha1.IngressMonitorStatus{
@@ -140,10 +155,11 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 
 func TestOperator_OnUpdate_IngressMonitor(t *testing.T) {
 	t.Run("without registered provider", func(t *testing.T) {
-		op, _ := NewOperator(nil, nil, "", time.Minute, provider.DefaultFactory())
+		fact := provider.NewFactory(nil)
+		op, _ := NewOperator(nil, nil, "", time.Minute, fact)
 
 		prov := new(fake.SimpleProvider)
-		provider.Register("simple", fake.FactoryFunc(prov))
+		fact.Register("simple", fake.FactoryFunc(prov))
 
 		crd := &v1alpha1.IngressMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -151,8 +167,11 @@ func TestOperator_OnUpdate_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "test",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "test",
+					},
 				},
 			},
 		}
@@ -165,20 +184,19 @@ func TestOperator_OnUpdate_IngressMonitor(t *testing.T) {
 	})
 
 	t.Run("with error updating monitor", func(t *testing.T) {
-		defer provider.DefaultFactory().Flush()
+		fact := provider.NewFactory(nil)
 
 		err := errors.New("my-provider-error")
 		prov := new(fake.SimpleProvider)
-		prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) error {
+		prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) (string, error) {
 			if status != "12345" {
 				t.Errorf("Expected status to be `12345`, got `%s`", status)
 			}
-			return err
+			return status, err
 		}
 
-		provider.Register("simple", fake.FactoryFunc(prov))
-
-		op, _ := NewOperator(nil, nil, "", time.Minute, provider.DefaultFactory())
+		fact.Register("simple", fake.FactoryFunc(prov))
+		op, _ := NewOperator(nil, nil, "", time.Minute, fact)
 
 		crd := &v1alpha1.IngressMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -186,8 +204,11 @@ func TestOperator_OnUpdate_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "simple",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
 			},
 			Status: v1alpha1.IngressMonitorStatus{
@@ -203,17 +224,17 @@ func TestOperator_OnUpdate_IngressMonitor(t *testing.T) {
 	})
 
 	t.Run("without errors", func(t *testing.T) {
-		defer provider.DefaultFactory().Flush()
+		fact := provider.NewFactory(nil)
 
 		prov := new(fake.SimpleProvider)
-		prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) error {
+		prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) (string, error) {
 			if status != "12345" {
 				t.Errorf("Expected status to be `12345`, got `%s`", status)
 			}
-			return nil
+			return status, nil
 		}
 
-		provider.Register("simple", fake.FactoryFunc(prov))
+		fact.Register("simple", fake.FactoryFunc(prov))
 
 		crd := &v1alpha1.IngressMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -221,15 +242,18 @@ func TestOperator_OnUpdate_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "simple",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
 			},
 			Status: v1alpha1.IngressMonitorStatus{
 				ID: "12345",
 			},
 		}
-		op, _ := NewOperator(nil, nil, "", time.Minute, provider.DefaultFactory())
+		op, _ := NewOperator(nil, nil, "", time.Minute, fact)
 
 		op.OnUpdate(crd, crd)
 
@@ -241,10 +265,11 @@ func TestOperator_OnUpdate_IngressMonitor(t *testing.T) {
 
 func TestOperator_OnDelete_IngressMonitor(t *testing.T) {
 	t.Run("without registered provider", func(t *testing.T) {
-		op, _ := NewOperator(nil, nil, "", time.Minute, provider.DefaultFactory())
+		fact := provider.NewFactory(nil)
+		op, _ := NewOperator(nil, nil, "", time.Minute, fact)
 
 		prov := new(fake.SimpleProvider)
-		provider.Register("simple", fake.FactoryFunc(prov))
+		fact.Register("simple", fake.FactoryFunc(prov))
 
 		crd := &v1alpha1.IngressMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -252,8 +277,11 @@ func TestOperator_OnDelete_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "test",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "test",
+					},
 				},
 			},
 		}
@@ -266,7 +294,7 @@ func TestOperator_OnDelete_IngressMonitor(t *testing.T) {
 	})
 
 	t.Run("with error deleting monitor", func(t *testing.T) {
-		defer provider.DefaultFactory().Flush()
+		fact := provider.NewFactory(nil)
 
 		err := errors.New("my-provider-error")
 		prov := new(fake.SimpleProvider)
@@ -277,9 +305,8 @@ func TestOperator_OnDelete_IngressMonitor(t *testing.T) {
 			return err
 		}
 
-		provider.Register("simple", fake.FactoryFunc(prov))
-
-		op, _ := NewOperator(nil, nil, "", time.Minute, provider.DefaultFactory())
+		fact.Register("simple", fake.FactoryFunc(prov))
+		op, _ := NewOperator(nil, nil, "", time.Minute, fact)
 
 		crd := &v1alpha1.IngressMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -287,8 +314,11 @@ func TestOperator_OnDelete_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "simple",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
 			},
 			Status: v1alpha1.IngressMonitorStatus{
@@ -304,7 +334,7 @@ func TestOperator_OnDelete_IngressMonitor(t *testing.T) {
 	})
 
 	t.Run("without errors", func(t *testing.T) {
-		defer provider.DefaultFactory().Flush()
+		fact := provider.NewFactory(nil)
 
 		prov := new(fake.SimpleProvider)
 		prov.DeleteFunc = func(status string) error {
@@ -314,7 +344,7 @@ func TestOperator_OnDelete_IngressMonitor(t *testing.T) {
 			return nil
 		}
 
-		provider.Register("simple", fake.FactoryFunc(prov))
+		fact.Register("simple", fake.FactoryFunc(prov))
 
 		crd := &v1alpha1.IngressMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -322,15 +352,18 @@ func TestOperator_OnDelete_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "simple",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
 			},
 			Status: v1alpha1.IngressMonitorStatus{
 				ID: "12345",
 			},
 		}
-		op, _ := NewOperator(nil, nil, "", time.Minute, provider.DefaultFactory())
+		op, _ := NewOperator(nil, nil, "", time.Minute, fact)
 
 		op.OnDelete(crd)
 
@@ -355,7 +388,8 @@ func Test_OnAdd_Monitor(t *testing.T) {
 		k8sClient := k8sfake.NewSimpleClientset(ing)
 		crdClient := imfake.NewSimpleClientset()
 
-		op, _ := NewOperator(k8sClient, crdClient, v1.NamespaceAll, time.Minute, provider.DefaultFactory())
+		fact := provider.NewFactory(nil)
+		op, _ := NewOperator(k8sClient, crdClient, v1.NamespaceAll, time.Minute, fact)
 
 		mon := &v1alpha1.Monitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -405,7 +439,7 @@ func Test_OnAdd_Monitor(t *testing.T) {
 
 		t.Run("without provider configured", func(t *testing.T) {
 			crdClient := imfake.NewSimpleClientset()
-			op, _ := NewOperator(k8sClient, crdClient, v1.NamespaceAll, time.Minute, provider.DefaultFactory())
+			op, _ := NewOperator(k8sClient, crdClient, v1.NamespaceAll, time.Minute, provider.NewFactory(nil))
 
 			mon := &v1alpha1.Monitor{
 				ObjectMeta: metav1.ObjectMeta{
@@ -450,10 +484,16 @@ func Test_OnAdd_Monitor(t *testing.T) {
 					Name:      "test-template",
 					Namespace: "testing",
 				},
+				Spec: v1alpha1.MonitorTemplateSpec{
+					Type: "HTTP",
+					HTTP: &v1alpha1.HTTPTemplate{
+						Endpoint: ptrString("/_healthz"),
+					},
+				},
 			}
 
 			crdClient := imfake.NewSimpleClientset(prov, tmpl)
-			op, _ := NewOperator(k8sClient, crdClient, v1.NamespaceAll, time.Minute, provider.DefaultFactory())
+			op, _ := NewOperator(k8sClient, crdClient, v1.NamespaceAll, time.Minute, provider.NewFactory(nil))
 
 			mon := &v1alpha1.Monitor{
 				ObjectMeta: metav1.ObjectMeta{
@@ -487,6 +527,157 @@ func Test_OnAdd_Monitor(t *testing.T) {
 				t.Errorf("Expected 2 IngressMonitor to be registered, got %d", len(imList.Items))
 			}
 		})
+
+		t.Run("with templating set up", func(t *testing.T) {
+			prov := &v1alpha1.Provider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-provider",
+					Namespace: "testing",
+				},
+			}
+
+			tmpl := &v1alpha1.MonitorTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-template",
+					Namespace: "testing",
+				},
+				Spec: v1alpha1.MonitorTemplateSpec{
+					Name: "some-test-{{.IngressName}}-{{.IngressNamespace}}",
+					Type: "HTTP",
+					HTTP: &v1alpha1.HTTPTemplate{
+						Endpoint: ptrString("/_healthz"),
+					},
+				},
+			}
+
+			crdClient := imfake.NewSimpleClientset(prov, tmpl)
+			op, _ := NewOperator(k8sClient, crdClient, v1.NamespaceAll, time.Minute, provider.NewFactory(nil))
+
+			mon := &v1alpha1.Monitor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-monitor",
+					Namespace: "testing",
+				},
+				Spec: v1alpha1.MonitorSpec{
+					Selector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"team": "gophers",
+						},
+					},
+					Provider: v1.LocalObjectReference{
+						Name: "test-provider",
+					},
+					Template: v1.LocalObjectReference{
+						Name: "test-template",
+					},
+				},
+			}
+
+			op.OnAdd(mon)
+
+			imList, err := crdClient.Ingressmonitor().IngressMonitors(mon.Namespace).
+				List(metav1.ListOptions{})
+			if err != nil {
+				t.Fatalf("Could not get IngressMonitor List: %s", err)
+			}
+
+			if len(imList.Items) != 2 {
+				t.Errorf("Expected 2 IngressMonitor to be registered, got %d", len(imList.Items))
+			}
+
+			// check if the templated name is parsed
+			expectedName := "some-test-test-ingress-testing"
+			if name := imList.Items[0].Spec.Template.Name; name != expectedName {
+				t.Errorf("Expected name to be `%s`, got `%s", expectedName, name)
+			}
+		})
+	})
+
+	t.Run("it should set up values correctly", func(t *testing.T) {
+		ing := &v1beta1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-ingress",
+				Namespace: "testing",
+				Labels: map[string]string{
+					"team": "gophers",
+				},
+			},
+			Spec: v1beta1.IngressSpec{
+				TLS: []v1beta1.IngressTLS{
+					{
+						Hosts: []string{
+							"test-host.sphc.io",
+						},
+					},
+				},
+				Rules: []v1beta1.IngressRule{
+					{Host: "test-host.sphc.io"},
+				},
+			},
+		}
+
+		k8sClient := k8sfake.NewSimpleClientset(ing)
+
+		prov := &v1alpha1.Provider{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-provider",
+				Namespace: "testing",
+			},
+		}
+
+		tmpl := &v1alpha1.MonitorTemplate{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-template",
+				Namespace: "testing",
+			},
+			Spec: v1alpha1.MonitorTemplateSpec{
+				Type: "HTTP",
+				HTTP: &v1alpha1.HTTPTemplate{
+					Endpoint: ptrString("/_healthz"),
+				},
+			},
+		}
+
+		crdClient := imfake.NewSimpleClientset(prov, tmpl)
+		op, _ := NewOperator(k8sClient, crdClient, v1.NamespaceAll, time.Minute, provider.NewFactory(nil))
+
+		mon := &v1alpha1.Monitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-monitor",
+				Namespace: "testing",
+			},
+			Spec: v1alpha1.MonitorSpec{
+				Selector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"team": "gophers",
+					},
+				},
+				Provider: v1.LocalObjectReference{
+					Name: "test-provider",
+				},
+				Template: v1.LocalObjectReference{
+					Name: "test-template",
+				},
+			},
+		}
+
+		op.OnAdd(mon)
+
+		imList, err := crdClient.Ingressmonitor().IngressMonitors(mon.Namespace).
+			List(metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("Could not get IngressMonitor List: %s", err)
+		}
+
+		if len(imList.Items) != 1 {
+			t.Errorf("Expected 1 IngressMonitor, got %d", len(imList.Items))
+		}
+
+		im := imList.Items[0]
+		expURL := "https://test-host.sphc.io/_healthz"
+		if url := im.Spec.Template.HTTP.URL; url != expURL {
+			t.Errorf("Expected URL to be `%s`, got `%s`", expURL, url)
+		}
 	})
 }
 
@@ -532,6 +723,10 @@ func Test_OnUpdate_Monitor(t *testing.T) {
 			Name:      "test-template",
 			Namespace: "testing",
 		},
+		Spec: v1alpha1.MonitorTemplateSpec{
+			Type: "HTTP",
+			HTTP: &v1alpha1.HTTPTemplate{},
+		},
 	}
 
 	mon := &v1alpha1.Monitor{
@@ -565,7 +760,7 @@ func Test_OnUpdate_Monitor(t *testing.T) {
 		ing1, _ = k8sClient.Extensions().Ingresses(ing1.Namespace).Create(ing1)
 		ing2, _ = k8sClient.Extensions().Ingresses(ing2.Namespace).Create(ing2)
 
-		op, _ = NewOperator(k8sClient, crdClient, v1.NamespaceAll, time.Minute, provider.DefaultFactory())
+		op, _ = NewOperator(k8sClient, crdClient, v1.NamespaceAll, time.Minute, provider.NewFactory(nil))
 		// we won't start the operator so the informers aren't automatically
 		// trigerred. Make sure the monitor is added correctly.
 		op.OnAdd(mon)
@@ -695,4 +890,8 @@ func Test_OnUpdate_Monitor(t *testing.T) {
 			}
 		})
 	})
+}
+
+func ptrString(s string) *string {
+	return &s
 }

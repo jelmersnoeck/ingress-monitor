@@ -7,8 +7,8 @@ type MonitorTemplateSpec struct {
 	// Type describes the type of check we want to use.
 	Type string `json:"type"`
 
-	// Name is the template that will be used to set the name of the check. It
-	// follows the Go Template syntax.
+	// Name is the template that will be used to set the name of the check. If
+	// configured through a Monitor, this follows the Go Template Syntax.
 	Name string `json:"name"`
 
 	// CheckRate describes the number of seconds between checks. This defaults
@@ -35,7 +35,7 @@ type MonitorTemplateSpec struct {
 type HTTPTemplate struct {
 	// URL describes the fully qualified URL that will be used for the monitor.
 	// +optional
-	URL *string `json:"url,omitempty"`
+	URL string `json:"url,omitempty"`
 
 	// Endpoint describes the Endpoint we want to check for the given website.
 	// Defaults to `/_healthz`.
@@ -66,6 +66,10 @@ type HTTPTemplate struct {
 	// response body when performing the check. Defaults to ``.
 	// +optional
 	ShouldNotContain string `json:"shouldNotContain,omitempty"`
+
+	// FollowRedirects specifies if the check should follow redirects or not.
+	// +optional
+	FollowRedirects bool `json:"followRedirects,omitempty"`
 }
 
 // +genclient

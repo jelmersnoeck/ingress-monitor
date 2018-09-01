@@ -5,6 +5,9 @@ a client when an [IngressMonitor](./ingress-monitor.md) is added to the cluster.
 
 There are different types of providers, each containing their own configuration.
 
+A provider is namespace scoped as it can reference Secrets and ConfigMaps. These
+Secrets and ConfigMaps need to live in the same namespace as the Provider.
+
 ## StatusCake
 
 A StatusCake Provider has 2 required fields, the `username` and `apiKey` which
@@ -19,6 +22,7 @@ apiVersion: ingressmonitor.sphc.io/v1alpha1
 kind: Provider
 metadata:
   name: prod-statuscake
+  namespace: websites
 spec:
   # Required. The type of provider used to
   type: StatusCake

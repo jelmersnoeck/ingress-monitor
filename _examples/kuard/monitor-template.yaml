@@ -1,0 +1,14 @@
+apiVersion: ingressmonitor.sphc.io/v1alpha1
+kind: MonitorTemplate
+metadata:
+  name: go-apps
+spec:
+  type: HTTP
+  checkRate: 300s
+  confirmations: 1
+  name: '{{.IngressName}}-{{.IngressNamespace}}'
+  timeout: 30s
+  http:
+    endpoint: '/_healthz'
+    customHeader: "Custom-Header: IngressMonitor"
+    userAgent: "Siphoc IngressMonitor"

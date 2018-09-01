@@ -269,6 +269,7 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 						Namespace:    obj.Namespace,
 						ProviderSpec: prov.Spec,
 					},
+					// XXX make sure to parse the name template
 					Template: tmpl.Spec,
 				},
 			}

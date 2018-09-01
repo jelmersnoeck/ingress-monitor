@@ -1,0 +1,379 @@
+package statuscake
+
+import (
+	"errors"
+	"reflect"
+	"strconv"
+	"testing"
+
+	"github.com/DreamItGetIT/statuscake"
+	"github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
+)
+
+func TestTranslateSpec(t *testing.T) {
+	tcs := []struct {
+		name     string
+		spec     v1alpha1.MonitorTemplateSpec
+		groups   []string
+		expected *statuscake.Test
+	}{
+		{
+			"simple HTTP config",
+			v1alpha1.MonitorTemplateSpec{
+				Type: "HTTP",
+				HTTP: &v1alpha1.HTTPTemplate{
+					CustomHeader: "Test-Header",
+					UserAgent:    "(Test User Agent)", URL: "http://fully-qualified-url.com",
+					FollowRedirects: true,
+				},
+			},
+			nil,
+			&statuscake.Test{
+				TestType:       "HTTP",
+				CustomHeader:   "Test-Header",
+				UserAgent:      "(Test User Agent)",
+				WebsiteURL:     "http://fully-qualified-url.com",
+				FollowRedirect: true,
+			},
+		},
+		{
+			"HTTP config should contain",
+			v1alpha1.MonitorTemplateSpec{
+				Type: "HTTP",
+				HTTP: &v1alpha1.HTTPTemplate{
+					CustomHeader:    "Test-Header",
+					UserAgent:       "(Test User Agent)",
+					URL:             "http://fully-qualified-url.com",
+					FollowRedirects: true,
+					ShouldContain:   "this string",
+				},
+			},
+			nil,
+			&statuscake.Test{
+				TestType:       "HTTP",
+				CustomHeader:   "Test-Header",
+				UserAgent:      "(Test User Agent)",
+				WebsiteURL:     "http://fully-qualified-url.com",
+				FollowRedirect: true,
+				FindString:     "this string",
+				DoNotFind:      false,
+			},
+		},
+		{
+			"HTTP config should not contain",
+			v1alpha1.MonitorTemplateSpec{
+				Type: "HTTP",
+				HTTP: &v1alpha1.HTTPTemplate{
+					CustomHeader:     "Test-Header",
+					UserAgent:        "(Test User Agent)",
+					URL:              "http://fully-qualified-url.com",
+					FollowRedirects:  true,
+					ShouldNotContain: "this string",
+				},
+			},
+			nil,
+			&statuscake.Test{
+				TestType:       "HTTP",
+				CustomHeader:   "Test-Header",
+				UserAgent:      "(Test User Agent)",
+				WebsiteURL:     "http://fully-qualified-url.com",
+				FollowRedirect: true,
+				FindString:     "this string",
+				DoNotFind:      true,
+			},
+		},
+		{
+			"HTTP config with contact groups",
+			v1alpha1.MonitorTemplateSpec{
+				Type: "HTTP",
+				HTTP: &v1alpha1.HTTPTemplate{
+					CustomHeader:    "Test-Header",
+					UserAgent:       "(Test User Agent)",
+					URL:             "http://fully-qualified-url.com",
+					FollowRedirects: true,
+				},
+			},
+			[]string{"12345"},
+			&statuscake.Test{
+				TestType:       "HTTP",
+				CustomHeader:   "Test-Header",
+				UserAgent:      "(Test User Agent)",
+				WebsiteURL:     "http://fully-qualified-url.com",
+				FollowRedirect: true,
+				ContactGroup:   []string{"12345"},
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			cl := Client{groups: tc.groups}
+			translation, err := cl.translateSpec(tc.spec)
+			if err != nil {
+				t.Errorf("Expected no error, got %s", err)
+				return
+			}
+
+			if !reflect.DeepEqual(translation, tc.expected) {
+				t.Errorf("Expected translation to equal \n%#v\ngot\n%#v", tc.expected, translation)
+			}
+		})
+	}
+}
+
+func TestClient_Delete(t *testing.T) {
+	fc := new(fakeClient)
+	cl := &Client{cl: fc}
+
+	t.Run("without an error", func(t *testing.T) {
+		defer fc.flush()
+
+		fc.deleteFunc = func(i int) error {
+			if strconv.Itoa(i) != "12345" {
+				t.Errorf("Expected id `12345`, got `%d`", i)
+			}
+
+			return nil
+		}
+
+		if err := cl.Delete("12345"); err != nil {
+			t.Errorf("Expected no error, got %s", err)
+		}
+
+		if fc.deleteCount != 1 {
+			t.Errorf("Expected 1 delete call, got %d", fc.deleteCount)
+		}
+	})
+
+	t.Run("with an error", func(t *testing.T) {
+		t.Run("invalid number", func(t *testing.T) {
+			defer fc.flush()
+
+			if err := cl.Delete("not-a-number"); err == nil {
+				t.Errorf("Expected an error, got none")
+			}
+
+			if fc.deleteCount != 0 {
+				t.Errorf("Expected no delete calls, got %d", fc.deleteCount)
+			}
+		})
+
+		t.Run("statuscake error", func(t *testing.T) {
+			defer fc.flush()
+
+			scError := errors.New("statuscake error")
+			fc.deleteFunc = func(i int) error {
+				if strconv.Itoa(i) != "12345" {
+					t.Errorf("Expected id `12345`, got `%d`", i)
+				}
+
+				return scError
+			}
+
+			if err := cl.Delete("12345"); err != scError {
+				t.Errorf("Expected `%s` error, got `%s`", scError, err)
+			}
+
+			if fc.deleteCount != 1 {
+				t.Errorf("Expected 1 delete call, got %d", fc.deleteCount)
+			}
+		})
+	})
+}
+
+func TestClient_Create(t *testing.T) {
+	fc := new(fakeClient)
+	cl := &Client{cl: fc}
+
+	t.Run("without error", func(t *testing.T) {
+		defer fc.flush()
+
+		tpl := v1alpha1.MonitorTemplateSpec{
+			Type: "HTTP",
+			HTTP: &v1alpha1.HTTPTemplate{
+				CustomHeader: "Test-Header",
+				UserAgent:    "(Test User Agent)", URL: "http://fully-qualified-url.com",
+				FollowRedirects: true,
+			},
+		}
+
+		fc.updateFunc = func(sct *statuscake.Test) (*statuscake.Test, error) {
+			sct.TestID = 12345
+			return sct, nil
+		}
+
+		id, err := cl.Create(tpl)
+		if err != nil {
+			t.Errorf("Expected no error, got %s", err)
+		}
+
+		if id != "12345" {
+			t.Errorf("Expected ID to be `12345`, got `%s`", id)
+		}
+
+		if fc.updateCount != 1 {
+			t.Errorf("Expected 1 udpate call, got %d", fc.updateCount)
+		}
+	})
+
+	t.Run("with translation error", func(t *testing.T) {
+		defer fc.flush()
+
+		tpl := v1alpha1.MonitorTemplateSpec{
+			Type:    "HTTP",
+			Timeout: ptrString("thisisnotvalid"),
+			HTTP: &v1alpha1.HTTPTemplate{
+				CustomHeader: "Test-Header",
+				UserAgent:    "(Test User Agent)", URL: "http://fully-qualified-url.com",
+				FollowRedirects: true,
+			},
+		}
+
+		_, err := cl.Create(tpl)
+		if err == nil {
+			t.Errorf("Expected error, got none")
+		}
+
+		if fc.updateCount != 0 {
+			t.Errorf("Expected 0 udpate calls, got %d", fc.updateCount)
+		}
+	})
+
+	t.Run("with statuscake error", func(t *testing.T) {
+		defer fc.flush()
+
+		tpl := v1alpha1.MonitorTemplateSpec{
+			Type: "HTTP",
+			HTTP: &v1alpha1.HTTPTemplate{
+				CustomHeader: "Test-Header",
+				UserAgent:    "(Test User Agent)", URL: "http://fully-qualified-url.com",
+				FollowRedirects: true,
+			},
+		}
+
+		scError := errors.New("StatusCakeError")
+		fc.updateFunc = func(sct *statuscake.Test) (*statuscake.Test, error) {
+			return nil, scError
+		}
+
+		_, err := cl.Create(tpl)
+		if err != scError {
+			t.Errorf("Expected %s error, got %s", scError, err)
+		}
+
+		if fc.updateCount != 1 {
+			t.Errorf("Expected 1 udpate call, got %d", fc.updateCount)
+		}
+	})
+}
+
+func TestClient_Update(t *testing.T) {
+	fc := new(fakeClient)
+	cl := &Client{cl: fc}
+
+	t.Run("without error", func(t *testing.T) {
+		defer fc.flush()
+
+		tpl := v1alpha1.MonitorTemplateSpec{
+			Type: "HTTP",
+			HTTP: &v1alpha1.HTTPTemplate{
+				CustomHeader: "Test-Header",
+				UserAgent:    "(Test User Agent)", URL: "http://fully-qualified-url.com",
+				FollowRedirects: true,
+			},
+		}
+
+		fc.updateFunc = func(sct *statuscake.Test) (*statuscake.Test, error) {
+			if sct.TestID != 12345 {
+				t.Errorf("Expected TestID to be `12345`, got `%d`", sct.TestID)
+			}
+			return sct, nil
+		}
+
+		if err := cl.Update("12345", tpl); err != nil {
+			t.Errorf("Expected no error, got %s", err)
+		}
+
+		if fc.updateCount != 1 {
+			t.Errorf("Expected 1 udpate call, got %d", fc.updateCount)
+		}
+	})
+
+	t.Run("with translation error", func(t *testing.T) {
+		defer fc.flush()
+
+		tpl := v1alpha1.MonitorTemplateSpec{
+			Type:    "HTTP",
+			Timeout: ptrString("thisisnotvalid"),
+			HTTP: &v1alpha1.HTTPTemplate{
+				CustomHeader: "Test-Header",
+				UserAgent:    "(Test User Agent)", URL: "http://fully-qualified-url.com",
+				FollowRedirects: true,
+			},
+		}
+
+		if err := cl.Update("12345", tpl); err == nil {
+			t.Errorf("Expected error, got none")
+		}
+
+		if fc.updateCount != 0 {
+			t.Errorf("Expected 0 udpate calls, got %d", fc.updateCount)
+		}
+	})
+
+	t.Run("with statuscake error", func(t *testing.T) {
+		defer fc.flush()
+
+		tpl := v1alpha1.MonitorTemplateSpec{
+			Type: "HTTP",
+			HTTP: &v1alpha1.HTTPTemplate{
+				CustomHeader: "Test-Header",
+				UserAgent:    "(Test User Agent)", URL: "http://fully-qualified-url.com",
+				FollowRedirects: true,
+			},
+		}
+
+		scError := errors.New("StatusCakeError")
+		fc.updateFunc = func(sct *statuscake.Test) (*statuscake.Test, error) {
+			return nil, scError
+		}
+
+		if err := cl.Update("12345", tpl); err != scError {
+			t.Errorf("Expected %s error, got %s", scError, err)
+		}
+
+		if fc.updateCount != 1 {
+			t.Errorf("Expected 1 udpate call, got %d", fc.updateCount)
+		}
+	})
+}
+
+type fakeClient struct {
+	deleteFunc  func(int) error
+	deleteCount int
+
+	updateFunc  func(*statuscake.Test) (*statuscake.Test, error)
+	updateCount int
+}
+
+func (c *fakeClient) Delete(i int) error {
+	c.deleteCount++
+	return c.deleteFunc(i)
+}
+
+func (c *fakeClient) Update(t *statuscake.Test) (*statuscake.Test, error) {
+	c.updateCount++
+	return c.updateFunc(t)
+}
+
+func (c *fakeClient) flush() {
+	c.deleteFunc = nil
+	c.deleteCount = 0
+
+	c.updateFunc = nil
+	c.updateCount = 0
+}
+
+func ptrString(s string) *string {
+	return &s
+}

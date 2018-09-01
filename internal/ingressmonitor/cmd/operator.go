@@ -6,6 +6,7 @@ import (
 
 	"github.com/jelmersnoeck/ingress-monitor/internal/ingressmonitor"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider"
+	"github.com/jelmersnoeck/ingress-monitor/internal/provider/statuscake"
 	"github.com/jelmersnoeck/ingress-monitor/internal/signals"
 	"github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned"
 
@@ -52,9 +53,12 @@ func runOperator(cmd *cobra.Command, args []string) {
 		log.Fatalf("Error building IngressMonitor clientset: %s", err)
 	}
 
+	fact := provider.NewFactory(nil)
+	statuscake.Register(fact)
+
 	op, err := ingressmonitor.NewOperator(
 		kubeClient, imClient, operatorFlags.Namespace,
-		resync, provider.DefaultFactory(),
+		resync, fact,
 	)
 	if err != nil {
 		log.Fatalf("Error building IngressMonitor Operator: %s", err)

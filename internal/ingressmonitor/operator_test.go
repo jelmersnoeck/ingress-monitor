@@ -521,6 +521,66 @@ func Test_OnAdd_Monitor(t *testing.T) {
 				t.Errorf("Expected 2 IngressMonitor to be registered, got %d", len(imList.Items))
 			}
 		})
+
+		t.Run("with templating set up", func(t *testing.T) {
+			prov := &v1alpha1.Provider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-provider",
+					Namespace: "testing",
+				},
+			}
+
+			tmpl := &v1alpha1.MonitorTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-template",
+					Namespace: "testing",
+				},
+				Spec: v1alpha1.MonitorTemplateSpec{
+					Name: "some-test-{{.IngressName}}-{{.IngressNamespace}}",
+				},
+			}
+
+			crdClient := imfake.NewSimpleClientset(prov, tmpl)
+			op, _ := NewOperator(k8sClient, crdClient, v1.NamespaceAll, time.Minute, provider.NewFactory(nil))
+
+			mon := &v1alpha1.Monitor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-monitor",
+					Namespace: "testing",
+				},
+				Spec: v1alpha1.MonitorSpec{
+					Selector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"team": "gophers",
+						},
+					},
+					Provider: v1.LocalObjectReference{
+						Name: "test-provider",
+					},
+					Template: v1.LocalObjectReference{
+						Name: "test-template",
+					},
+				},
+			}
+
+			op.OnAdd(mon)
+
+			imList, err := crdClient.Ingressmonitor().IngressMonitors(mon.Namespace).
+				List(metav1.ListOptions{})
+			if err != nil {
+				t.Fatalf("Could not get IngressMonitor List: %s", err)
+			}
+
+			if len(imList.Items) != 2 {
+				t.Errorf("Expected 2 IngressMonitor to be registered, got %d", len(imList.Items))
+			}
+
+			// check if the templated name is parsed
+			expectedName := "some-test-test-ingress-testing"
+			if name := imList.Items[0].Spec.Template.Name; name != expectedName {
+				t.Errorf("Expected name to be `%s`, got `%s", expectedName, name)
+			}
+		})
 	})
 }
 

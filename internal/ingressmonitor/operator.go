@@ -1,8 +1,10 @@
 package ingressmonitor
 
 import (
+	"bytes"
 	"encoding/base32"
 	"fmt"
+	"html/template"
 	"log"
 	"strings"
 	"time"
@@ -13,6 +15,7 @@ import (
 	crdscheme "github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned/scheme"
 	"github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/informers/externalversions"
 
+	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -216,7 +219,7 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 	ingressList, err := o.kubeClient.Extensions().Ingresses(obj.Namespace).
 		List(listOptions(obj.Spec.Selector.MatchLabels))
 	if err != nil {
-		return err
+		return fmt.Errorf("Could not list Ingresses: %s", err)
 	}
 
 	// fetch the referenced provider
@@ -224,13 +227,14 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 		Get(obj.Spec.Provider.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
+		return fmt.Errorf("Could not get Provider: %s", err)
 	}
 
 	// fetch the referenced template
 	tmpl, err := o.imClient.Ingressmonitor().MonitorTemplates().
 		Get(obj.Spec.Template.Name, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return fmt.Errorf("Could not get MonitorTemplate: %s", err)
 	}
 
 	// reconcile the newly selected Ingresses. We'll create new IngressMonitors
@@ -239,6 +243,19 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 	for _, ing := range ingressList.Items {
 		for _, rule := range ing.Spec.Rules {
 			name := fmt.Sprintf("%s-%s", ing.Name, shortHash(rule.Host, 16))
+			igRef := *metav1.NewControllerRef(
+				&ing,
+				extensions.SchemeGroupVersion.WithKind("Ingress"),
+			)
+			igRef.Controller = nil
+
+			templateSpec := tmpl.Spec
+			tplName, err := templatedName(ing, templateSpec)
+			if err != nil {
+				return fmt.Errorf("Could not get templated name: %s", err)
+			}
+			templateSpec.Name = tplName
+
 			im := &v1alpha1.IngressMonitor{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -252,10 +269,7 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 							obj,
 							v1alpha1.SchemeGroupVersion.WithKind("Monitor"),
 						),
-						*metav1.NewControllerRef(
-							&ing,
-							extensions.SchemeGroupVersion.WithKind("Ingress"),
-						),
+						igRef,
 					},
 					// Set some labels so it's easier to filter later on
 					Labels: map[string]string{
@@ -269,19 +283,18 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 						Namespace:    obj.Namespace,
 						ProviderSpec: prov.Spec,
 					},
-					// XXX make sure to parse the name template
-					Template: tmpl.Spec,
+					Template: templateSpec,
 				},
 			}
 
-			_, err := o.imClient.Ingressmonitor().IngressMonitors(im.Namespace).Create(im)
+			_, err = o.imClient.Ingressmonitor().IngressMonitors(im.Namespace).Create(im)
 			if errors.IsAlreadyExists(err) {
 				_, err = o.imClient.Ingressmonitor().IngressMonitors(im.Namespace).
 					Update(im)
 			}
 
 			if err != nil {
-				return err
+				return fmt.Errorf("Could not ensure IngressMonitor: %s", err)
 			}
 		}
 	}
@@ -302,4 +315,25 @@ func shortHash(data string, len int) string {
 	b2b, _ := blake2b.New(&blake2b.Config{Size: uint8(len * 5 / 8)})
 	b2b.Write([]byte(data))
 	return strings.ToLower(encoder.EncodeToString(b2b.Sum(nil)))
+}
+
+func templatedName(ing v1beta1.Ingress, sp v1alpha1.MonitorTemplateSpec) (string, error) {
+	tpl, err := template.New("im-name").Parse(sp.Name)
+	if err != nil {
+		return "", err
+	}
+
+	data := struct {
+		IngressName      string
+		IngressNamespace string
+	}{
+		IngressName:      ing.Name,
+		IngressNamespace: ing.Namespace,
+	}
+
+	buf := bytes.NewBufferString("")
+	if err := tpl.Execute(buf, data); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }

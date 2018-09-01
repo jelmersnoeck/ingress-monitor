@@ -7,8 +7,8 @@ monitoring for your Kubernetes Ingress and Service objects.
 
 ## Status
 
-This is still a WIP. Currently resource syncs are not entirely implemented and
-no provider mappings have been implemented.
+This is still a WIP. The main piece currently missing is Custom Resource
+Definition validation and extra providers.
 
 ## Installation
 
@@ -18,6 +18,32 @@ To install the Operator, make sure you have RBAC enabled in your cluster.
 kubectl apply -f https://raw.githubusercontent.com/jelmersnoeck/ingress-monitor/master/docs/kube/with-rbac.yaml
 ```
 
+## Example
+
+There is an example installed in [the examples directory](./_examples/kuard). This is using
+StatusCake as a provider and is using [kuard](https://github.com/kubernetes-up-and-running/kuard) as the application it monitors.
+
+This is meant to demonstrate the configuration options.
+
+To use this, first you'll need to create an account with StatusCake and retrieve
+the API key.
+
+Following that, you can set up a secret which contains your credentials:
+
+```
+kubectl create namespace websites
+kubectl create secret generic statuscake-secrets -n websites --from-literal=username=<STATUSCAKE_USERNAME> --from-literal=apikey=<STATUSCAKE_APIKEY>
+```
+
+After this, you can apply the entire `_examples/kuard` folder:
+
+```
+kubectl apply -f _examples/kuard
+```
+
+This will set up a Provider, MonitorTemplate and Monitor along with a Deployment
+which is exposed through a Service and Ingress. The Ingress has the label
+`team: gophers` which is used by the Monitor to create an IngressMonitor.
 
 ## Supported Providers
 

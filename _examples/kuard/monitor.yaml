@@ -1,0 +1,13 @@
+apiVersion: ingressmonitor.sphc.io/v1alpha1
+kind: Monitor
+metadata:
+  name: gophers
+  namespace: websites
+spec:
+  selector:
+    matchLabels:
+      team: gophers
+  provider:
+    name: prod-gophers
+  template:
+    name: go-apps

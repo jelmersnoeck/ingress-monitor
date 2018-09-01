@@ -219,7 +219,7 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 	}
 
 	// fetch the referenced provider
-	prov, err := o.imClient.Ingressmonitor().Providers().
+	prov, err := o.imClient.Ingressmonitor().Providers(obj.Namespace).
 		Get(obj.Spec.Provider.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -264,7 +264,10 @@ func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
 					},
 				},
 				Spec: v1alpha1.IngressMonitorSpec{
-					Provider: prov.Spec,
+					Provider: v1alpha1.NamespacedProvider{
+						Namespace:    obj.Namespace,
+						ProviderSpec: prov.Spec,
+					},
 					Template: tmpl.Spec,
 				},
 			}

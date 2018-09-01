@@ -15,13 +15,13 @@ var ErrProviderNotFound = errors.New("the specified provider can't be found")
 
 // FactoryFunc is the interface used to allow creating a new provider. This
 // shoud be used by provider wrappers to allow for creating new clients.
-type FactoryFunc func(v1alpha1.ProviderSpec) (Interface, error)
+type FactoryFunc func(v1alpha1.NamespacedProvider) (Interface, error)
 
 // FactoryInterface is the interface used for a ProviderFactory. It allows you
 // to fetch providers from a local store and use them to configure monitors.
 type FactoryInterface interface {
 	Register(string, FactoryFunc)
-	From(v1alpha1.ProviderSpec) (Interface, error)
+	From(v1alpha1.NamespacedProvider) (Interface, error)
 }
 
 // Register registers a provider which can be used from within the Factory to
@@ -30,8 +30,8 @@ func Register(name string, ff FactoryFunc) {
 	defaultProviderFactory.Register(name, ff)
 }
 
-// From returns a provider from the given ProviderSpec.
-func From(prov v1alpha1.ProviderSpec) (Interface, error) {
+// From returns a provider from the given NamespacedProvider.
+func From(prov v1alpha1.NamespacedProvider) (Interface, error) {
 	return defaultProviderFactory.From(prov)
 }
 
@@ -51,7 +51,7 @@ func (pf *SimpleFactory) Register(name string, ff FactoryFunc) {
 
 // From creates a new provider from the given configuration. This can then be
 // used to register the provider within the
-func (pf *SimpleFactory) From(prov v1alpha1.ProviderSpec) (Interface, error) {
+func (pf *SimpleFactory) From(prov v1alpha1.NamespacedProvider) (Interface, error) {
 	pf.lock.RLock()
 	defer pf.lock.RUnlock()
 

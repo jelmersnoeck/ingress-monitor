@@ -36,7 +36,7 @@ import (
 // ProvidersGetter has a method to return a ProviderInterface.
 // A group's client should implement this interface.
 type ProvidersGetter interface {
-	Providers() ProviderInterface
+	Providers(namespace string) ProviderInterface
 }
 
 // ProviderInterface has methods to work with Provider resources.
@@ -55,12 +55,14 @@ type ProviderInterface interface {
 // providers implements ProviderInterface
 type providers struct {
 	client rest.Interface
+	ns     string
 }
 
 // newProviders returns a Providers
-func newProviders(c *IngressmonitorV1alpha1Client) *providers {
+func newProviders(c *IngressmonitorV1alpha1Client, namespace string) *providers {
 	return &providers{
 		client: c.RESTClient(),
+		ns:     namespace,
 	}
 }
 
@@ -68,6 +70,7 @@ func newProviders(c *IngressmonitorV1alpha1Client) *providers {
 func (c *providers) Get(name string, options v1.GetOptions) (result *v1alpha1.Provider, err error) {
 	result = &v1alpha1.Provider{}
 	err = c.client.Get().
+		Namespace(c.ns).
 		Resource("providers").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -80,6 +83,7 @@ func (c *providers) Get(name string, options v1.GetOptions) (result *v1alpha1.Pr
 func (c *providers) List(opts v1.ListOptions) (result *v1alpha1.ProviderList, err error) {
 	result = &v1alpha1.ProviderList{}
 	err = c.client.Get().
+		Namespace(c.ns).
 		Resource("providers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
@@ -91,6 +95,7 @@ func (c *providers) List(opts v1.ListOptions) (result *v1alpha1.ProviderList, er
 func (c *providers) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
+		Namespace(c.ns).
 		Resource("providers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
@@ -100,6 +105,7 @@ func (c *providers) Watch(opts v1.ListOptions) (watch.Interface, error) {
 func (c *providers) Create(provider *v1alpha1.Provider) (result *v1alpha1.Provider, err error) {
 	result = &v1alpha1.Provider{}
 	err = c.client.Post().
+		Namespace(c.ns).
 		Resource("providers").
 		Body(provider).
 		Do().
@@ -111,6 +117,7 @@ func (c *providers) Create(provider *v1alpha1.Provider) (result *v1alpha1.Provid
 func (c *providers) Update(provider *v1alpha1.Provider) (result *v1alpha1.Provider, err error) {
 	result = &v1alpha1.Provider{}
 	err = c.client.Put().
+		Namespace(c.ns).
 		Resource("providers").
 		Name(provider.Name).
 		Body(provider).
@@ -122,6 +129,7 @@ func (c *providers) Update(provider *v1alpha1.Provider) (result *v1alpha1.Provid
 // Delete takes name of the provider and deletes it. Returns an error if one occurs.
 func (c *providers) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
+		Namespace(c.ns).
 		Resource("providers").
 		Name(name).
 		Body(options).
@@ -132,6 +140,7 @@ func (c *providers) Delete(name string, options *v1.DeleteOptions) error {
 // DeleteCollection deletes a collection of objects.
 func (c *providers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
+		Namespace(c.ns).
 		Resource("providers").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
@@ -143,6 +152,7 @@ func (c *providers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 func (c *providers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Provider, err error) {
 	result = &v1alpha1.Provider{}
 	err = c.client.Patch(pt).
+		Namespace(c.ns).
 		Resource("providers").
 		SubResource(subresources...).
 		Name(name).

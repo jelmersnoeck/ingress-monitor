@@ -38,7 +38,7 @@ func (fp *SimpleProvider) Update(id string, im v1alpha1.MonitorTemplateSpec) err
 // FactoryFunc is used to register the factory in a given test so we can use it
 // to test provider calls.
 func FactoryFunc(sp *SimpleProvider) provider.FactoryFunc {
-	return func(v1alpha1.ProviderSpec) (provider.Interface, error) {
+	return func(v1alpha1.NamespacedProvider) (provider.Interface, error) {
 		return sp, nil
 	}
 }

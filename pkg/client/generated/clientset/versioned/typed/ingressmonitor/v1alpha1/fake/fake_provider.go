@@ -37,6 +37,7 @@ import (
 // FakeProviders implements ProviderInterface
 type FakeProviders struct {
 	Fake *FakeIngressmonitorV1alpha1
+	ns   string
 }
 
 var providersResource = schema.GroupVersionResource{Group: "ingressmonitor.sphc.io", Version: "v1alpha1", Resource: "providers"}
@@ -46,7 +47,8 @@ var providersKind = schema.GroupVersionKind{Group: "ingressmonitor.sphc.io", Ver
 // Get takes name of the provider, and returns the corresponding provider object, and an error if there is any.
 func (c *FakeProviders) Get(name string, options v1.GetOptions) (result *v1alpha1.Provider, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(providersResource, name), &v1alpha1.Provider{})
+		Invokes(testing.NewGetAction(providersResource, c.ns, name), &v1alpha1.Provider{})
+
 	if obj == nil {
 		return nil, err
 	}
@@ -56,7 +58,8 @@ func (c *FakeProviders) Get(name string, options v1.GetOptions) (result *v1alpha
 // List takes label and field selectors, and returns the list of Providers that match those selectors.
 func (c *FakeProviders) List(opts v1.ListOptions) (result *v1alpha1.ProviderList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(providersResource, providersKind, opts), &v1alpha1.ProviderList{})
+		Invokes(testing.NewListAction(providersResource, providersKind, c.ns, opts), &v1alpha1.ProviderList{})
+
 	if obj == nil {
 		return nil, err
 	}
@@ -77,13 +80,15 @@ func (c *FakeProviders) List(opts v1.ListOptions) (result *v1alpha1.ProviderList
 // Watch returns a watch.Interface that watches the requested providers.
 func (c *FakeProviders) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(providersResource, opts))
+		InvokesWatch(testing.NewWatchAction(providersResource, c.ns, opts))
+
 }
 
 // Create takes the representation of a provider and creates it.  Returns the server's representation of the provider, and an error, if there is any.
 func (c *FakeProviders) Create(provider *v1alpha1.Provider) (result *v1alpha1.Provider, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(providersResource, provider), &v1alpha1.Provider{})
+		Invokes(testing.NewCreateAction(providersResource, c.ns, provider), &v1alpha1.Provider{})
+
 	if obj == nil {
 		return nil, err
 	}
@@ -93,7 +98,8 @@ func (c *FakeProviders) Create(provider *v1alpha1.Provider) (result *v1alpha1.Pr
 // Update takes the representation of a provider and updates it. Returns the server's representation of the provider, and an error, if there is any.
 func (c *FakeProviders) Update(provider *v1alpha1.Provider) (result *v1alpha1.Provider, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(providersResource, provider), &v1alpha1.Provider{})
+		Invokes(testing.NewUpdateAction(providersResource, c.ns, provider), &v1alpha1.Provider{})
+
 	if obj == nil {
 		return nil, err
 	}
@@ -103,13 +109,14 @@ func (c *FakeProviders) Update(provider *v1alpha1.Provider) (result *v1alpha1.Pr
 // Delete takes name of the provider and deletes it. Returns an error if one occurs.
 func (c *FakeProviders) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(providersResource, name), &v1alpha1.Provider{})
+		Invokes(testing.NewDeleteAction(providersResource, c.ns, name), &v1alpha1.Provider{})
+
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeProviders) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(providersResource, listOptions)
+	action := testing.NewDeleteCollectionAction(providersResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.ProviderList{})
 	return err
@@ -118,7 +125,8 @@ func (c *FakeProviders) DeleteCollection(options *v1.DeleteOptions, listOptions 
 // Patch applies the patch and returns the patched provider.
 func (c *FakeProviders) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Provider, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(providersResource, name, data, subresources...), &v1alpha1.Provider{})
+		Invokes(testing.NewPatchSubresourceAction(providersResource, c.ns, name, data, subresources...), &v1alpha1.Provider{})
+
 	if obj == nil {
 		return nil, err
 	}

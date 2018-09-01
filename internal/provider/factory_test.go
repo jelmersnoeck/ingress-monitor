@@ -21,8 +21,10 @@ func TestProviderFactory(t *testing.T) {
 
 		provider.Register("simple", fake.FactoryFunc(prov))
 
-		cl, err := provider.From(v1alpha1.ProviderSpec{
-			Type: "simple",
+		cl, err := provider.From(v1alpha1.NamespacedProvider{
+			ProviderSpec: v1alpha1.ProviderSpec{
+				Type: "simple",
+			},
 		})
 
 		if err != nil {
@@ -37,8 +39,10 @@ func TestProviderFactory(t *testing.T) {
 	t.Run("without registered provider", func(t *testing.T) {
 		defer reset()
 
-		_, err := provider.DefaultFactory().From(v1alpha1.ProviderSpec{
-			Type: "simple",
+		_, err := provider.DefaultFactory().From(v1alpha1.NamespacedProvider{
+			ProviderSpec: v1alpha1.ProviderSpec{
+				Type: "simple",
+			},
 		})
 
 		if err != provider.ErrProviderNotFound {

@@ -28,8 +28,11 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "test",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "test",
+					},
 				},
 			},
 		}
@@ -56,8 +59,11 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "simple",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
 			},
 		}
@@ -85,8 +91,11 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "simple",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
 			},
 		}
@@ -121,8 +130,11 @@ func TestOperator_OnAdd_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "test",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "test",
+					},
 				},
 			},
 			Status: v1alpha1.IngressMonitorStatus{
@@ -151,8 +163,11 @@ func TestOperator_OnUpdate_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "test",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "test",
+					},
 				},
 			},
 		}
@@ -186,8 +201,11 @@ func TestOperator_OnUpdate_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "simple",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
 			},
 			Status: v1alpha1.IngressMonitorStatus{
@@ -221,8 +239,11 @@ func TestOperator_OnUpdate_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "simple",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
 			},
 			Status: v1alpha1.IngressMonitorStatus{
@@ -252,8 +273,11 @@ func TestOperator_OnDelete_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "test",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "test",
+					},
 				},
 			},
 		}
@@ -287,8 +311,11 @@ func TestOperator_OnDelete_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "simple",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
 			},
 			Status: v1alpha1.IngressMonitorStatus{
@@ -322,8 +349,11 @@ func TestOperator_OnDelete_IngressMonitor(t *testing.T) {
 				Namespace: "testing",
 			},
 			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.ProviderSpec{
-					Type: "simple",
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
 			},
 			Status: v1alpha1.IngressMonitorStatus{

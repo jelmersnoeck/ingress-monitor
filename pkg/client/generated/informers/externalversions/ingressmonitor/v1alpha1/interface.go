@@ -68,5 +68,5 @@ func (v *version) MonitorTemplates() MonitorTemplateInformer {
 
 // Providers returns a ProviderInformer.
 func (v *version) Providers() ProviderInformer {
-	return &providerInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &providerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

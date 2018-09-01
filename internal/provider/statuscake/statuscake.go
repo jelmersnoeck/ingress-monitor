@@ -108,12 +108,12 @@ func (c *Client) Delete(id string) error {
 func (c *Client) Update(id string, spec v1alpha1.MonitorTemplateSpec) (string, error) {
 	iid, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		return "", err
+		return id, err
 	}
 
 	translation, err := c.translateSpec(spec)
 	if err != nil {
-		return "", err
+		return id, err
 	}
 
 	translation.TestID = int(iid)
@@ -133,7 +133,7 @@ func (c *Client) Update(id string, spec v1alpha1.MonitorTemplateSpec) (string, e
 	}
 
 	if err != nil {
-		return "", err
+		return id, err
 	}
 
 	return strconv.Itoa(sct.TestID), nil

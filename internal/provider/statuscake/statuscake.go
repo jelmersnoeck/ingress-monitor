@@ -14,6 +14,10 @@ import (
 	"github.com/DreamItGetIT/statuscake"
 )
 
+// The StatusCake Client we're using expects us to set this.
+// XXX remove this once we move to our own internal client.
+const statusCodes = "204,205,206,303,400,401,403,404,405,406,408,410,413,444,429,494,495,496,499,500,501,502,503,504,505,506,507,508,509,510,511,521,522,523,524,520,598,599"
+
 // Register registers the provider with a certain factory using the FactoryFunc.
 func Register(fact provider.FactoryInterface) {
 	fact.Register("StatusCake", FactoryFunc)
@@ -136,6 +140,12 @@ func (c *Client) Update(id string, spec v1alpha1.MonitorTemplateSpec) (string, e
 		return id, err
 	}
 
+	// The StatusCake API returns no ID if there is an update to the item. This
+	// means we need to check for this and actually avoid returning a "0" id.
+	if sct.TestID == 0 {
+		return id, nil
+	}
+
 	return strconv.Itoa(sct.TestID), nil
 }
 
@@ -146,6 +156,7 @@ func (c *Client) translateSpec(spec v1alpha1.MonitorTemplateSpec) (*statuscake.T
 		WebsiteName:  spec.Name,
 		TestType:     spec.Type,
 		ContactGroup: c.groups,
+		StatusCodes:  statusCodes,
 	}
 
 	if spec.Timeout != nil {

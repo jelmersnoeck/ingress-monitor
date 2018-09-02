@@ -167,6 +167,9 @@ func (o *Operator) handleIngressMonitor(obj *v1alpha1.IngressMonitor) error {
 		return err
 	}
 
+	// The ID has changed, update the status. This could happen when the test
+	// has been removed from the provider. The operator ensures that the test
+	// will be present, and thus create a new one.
 	if obj.Status.ID != id {
 		obj.Status.ID = id
 		_, err = o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).Update(obj)

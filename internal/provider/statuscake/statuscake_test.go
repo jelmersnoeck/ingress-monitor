@@ -219,8 +219,11 @@ func TestTranslateSpec(t *testing.T) {
 				return
 			}
 
-			if !reflect.DeepEqual(translation, tc.expected) {
-				t.Errorf("Expected translation to equal \n%#v\ngot\n%#v", tc.expected, translation)
+			exp := tc.expected
+			exp.StatusCodes = statusCodes
+
+			if !reflect.DeepEqual(translation, exp) {
+				t.Errorf("Expected translation to equal \n%#v\ngot\n%#v", exp, translation)
 			}
 		})
 	}
@@ -449,6 +452,42 @@ func TestClient_Update(t *testing.T) {
 
 		if fc.updateCount != 1 {
 			t.Errorf("Expected 1 udpate call, got %d", fc.updateCount)
+		}
+	})
+
+	t.Run("with changed fields", func(t *testing.T) {
+		defer fc.flush()
+
+		tpl := v1alpha1.MonitorTemplateSpec{
+			Type: "HTTP",
+			HTTP: &v1alpha1.HTTPTemplate{
+				CustomHeader: "Test-Header",
+				UserAgent:    "(Test User Agent)", URL: "http://fully-qualified-url.com",
+				FollowRedirects: true,
+			},
+		}
+
+		fc.updateFunc = func(sct *statuscake.Test) (*statuscake.Test, error) {
+			if sct.TestID != 12345 {
+				t.Errorf("Expected TestID to be `12345`, got `%d`", sct.TestID)
+			}
+
+			// StatusCake sets the ID to 0 if there's changes.
+			sct.TestID = 0
+			return sct, nil
+		}
+
+		id, err := cl.Update("12345", tpl)
+		if err != nil {
+			t.Errorf("Expected no error, got %s", err)
+		}
+
+		if fc.updateCount != 1 {
+			t.Errorf("Expected 1 udpate call, got %d", fc.updateCount)
+		}
+
+		if id != "12345" {
+			t.Errorf("Expected ID to be `12345`, got `%s`", id)
 		}
 	})
 }

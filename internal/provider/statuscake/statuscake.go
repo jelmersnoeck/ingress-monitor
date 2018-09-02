@@ -140,6 +140,12 @@ func (c *Client) Update(id string, spec v1alpha1.MonitorTemplateSpec) (string, e
 		return id, err
 	}
 
+	// The StatusCake API returns no ID if there is an update to the item. This
+	// means we need to check for this and actually avoid returning a "0" id.
+	if sct.TestID == 0 {
+		return id, nil
+	}
+
 	return strconv.Itoa(sct.TestID), nil
 }
 

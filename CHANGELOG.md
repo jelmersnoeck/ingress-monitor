@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- Correct RBAC rules for the ServiceAccount.
+
 ## v0.1.1 - 2018-09-02
 
 ### Fixed

@@ -147,8 +147,8 @@ spec:
           - operator
           resources:
             requests:
-              cpu: 10m
-              memory: 10Mi
-            requests:
-              cpu: 10m
-              memory: 10Mi
+              cpu: 1m
+              memory: 8Mi
+            limits:
+              cpu: 5m
+              memory: 16Mi

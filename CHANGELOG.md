@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Correct RBAC rules for the ServiceAccount.
 
+### Changed
+
+- Set up lower resource requests/limits for the Deployment.
+
 ## v0.1.1 - 2018-09-02
 
 ### Fixed

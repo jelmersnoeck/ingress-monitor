@@ -91,9 +91,15 @@ kind: ClusterRole
 metadata:
   name: ingress-monitor:operator
 rules:
+  - apiGroups: ["extensions"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
   - apiGroups: ["ingressmonitor.sphc.io"]
-    resources: ["providers", "monitors", "ingressmonitors"]
-    verbs: ["get", "list", "watch", "update", "patch"]
+    resources: ["providers", "monitors", "ingressmonitors", "monitortemplates"]
+    verbs: ["create", "get", "list", "watch", "update", "patch"]
 
 ---
 
@@ -141,8 +147,8 @@ spec:
           - operator
           resources:
             requests:
-              cpu: 10m
-              memory: 10Mi
-            requests:
-              cpu: 10m
-              memory: 10Mi
+              cpu: 1m
+              memory: 8Mi
+            limits:
+              cpu: 5m
+              memory: 16Mi

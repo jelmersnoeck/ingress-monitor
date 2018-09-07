@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- Log when something goes wrong with GarbageCollection.
+
 ### Fixed
 
 - Correct RBAC rules for the ServiceAccount.

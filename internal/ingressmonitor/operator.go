@@ -107,7 +107,9 @@ func (o *Operator) OnUpdate(old, new interface{}) {
 		// GC old objects, we do this on every run - even resyncs - so we can be
 		// sure that even when an Ingress changes it's spec, we update our
 		// configuration as well.
-		o.garbageCollectMonitors(obj)
+		if err := o.garbageCollectMonitors(obj); err != nil {
+			log.Printf("Error doing garbage collection for %s:%s: %s", obj.Namespace, obj.Name, err)
+		}
 
 		if err := o.handleMonitor(obj); err != nil {
 			log.Printf("Error updating Monitor %s:%s: %s", obj.Namespace, obj.Name, err)

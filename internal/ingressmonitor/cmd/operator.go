@@ -6,6 +6,7 @@ import (
 
 	"github.com/jelmersnoeck/ingress-monitor/internal/ingressmonitor"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider"
+	"github.com/jelmersnoeck/ingress-monitor/internal/provider/logger"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider/statuscake"
 	"github.com/jelmersnoeck/ingress-monitor/internal/signals"
 	"github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned"
@@ -55,6 +56,7 @@ func runOperator(cmd *cobra.Command, args []string) {
 
 	fact := provider.NewFactory(kubeClient)
 	statuscake.Register(fact)
+	logger.Register(fact)
 
 	op, err := ingressmonitor.NewOperator(
 		kubeClient, imClient, operatorFlags.Namespace,

@@ -99,7 +99,7 @@ rules:
     verbs: ["get"]
   - apiGroups: ["ingressmonitor.sphc.io"]
     resources: ["providers", "monitors", "ingressmonitors", "monitortemplates"]
-    verbs: ["create", "get", "list", "watch", "update", "patch"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
 
 ---
 

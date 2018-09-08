@@ -9,7 +9,7 @@ import (
 type MonitorSpec struct {
 	// Selector describes the LabelSelector which will be used to select the
 	// enabled Ingresses which we want to set up monitors for.
-	Selector metav1.LabelSelector `json:"selector"`
+	Selector *metav1.LabelSelector `json:"selector"`
 
 	// Provider describes the provider we want to use to set up the monitor
 	// with.

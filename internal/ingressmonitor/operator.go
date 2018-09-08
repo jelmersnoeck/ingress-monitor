@@ -89,6 +89,7 @@ func (o *Operator) Run(stopCh <-chan struct{}) error {
 	log.Printf("Starting the workers")
 	for i := 0; i < 4; i++ {
 		go wait.Until(runWorker(o.processNextIngressMonitor), time.Second, stopCh)
+		go wait.Until(runWorker(o.processNextMonitor), time.Second, stopCh)
 	}
 
 	<-stopCh
@@ -106,6 +107,10 @@ func runWorker(queue func() bool) func() {
 
 func (o *Operator) processNextIngressMonitor() bool {
 	return o.handleNextItem("IngressMonitors", o.ingressMonitorQueue, o.handleIngressMonitor)
+}
+
+func (o *Operator) processNextMonitor() bool {
+	return o.handleNextItem("Monitors", o.ingressMonitorQueue, o.handleMonitor)
 }
 
 func (o *Operator) handleNextItem(name string, queue workqueue.RateLimitingInterface, handlerFunc func(string) error) bool {
@@ -160,6 +165,10 @@ func (o *Operator) enqueueIngressMonitor(im *v1alpha1.IngressMonitor) {
 	o.enqueueItem(o.ingressMonitorQueue, im)
 }
 
+func (o *Operator) enqueueMonitor(m *v1alpha1.Monitor) {
+	o.enqueueItem(o.monitorQueue, m)
+}
+
 // OnAdd handles adding of IngressMonitors and Ingresses and sets up the
 // appropriate monitor with the configured providers.
 func (o *Operator) OnAdd(obj interface{}) {
@@ -167,9 +176,7 @@ func (o *Operator) OnAdd(obj interface{}) {
 	case *v1alpha1.IngressMonitor:
 		o.enqueueIngressMonitor(obj)
 	case *v1alpha1.Monitor:
-		if err := o.handleMonitor(obj); err != nil {
-			log.Printf("Error adding Monitor %s:%s: %s", obj.Namespace, obj.Name, err)
-		}
+		o.enqueueMonitor(obj)
 	}
 }
 
@@ -180,16 +187,7 @@ func (o *Operator) OnUpdate(old, new interface{}) {
 	case *v1alpha1.IngressMonitor:
 		o.enqueueIngressMonitor(obj)
 	case *v1alpha1.Monitor:
-		// GC old objects, we do this on every run - even resyncs - so we can be
-		// sure that even when an Ingress changes it's spec, we update our
-		// configuration as well.
-		if err := o.garbageCollectMonitors(obj); err != nil {
-			log.Printf("Error doing garbage collection for %s:%s: %s", obj.Namespace, obj.Name, err)
-		}
-
-		if err := o.handleMonitor(obj); err != nil {
-			log.Printf("Error updating Monitor %s:%s: %s", obj.Namespace, obj.Name, err)
-		}
+		o.enqueueMonitor(obj)
 	}
 }
 
@@ -331,8 +329,28 @@ func (o *Operator) garbageCollectMonitors(obj *v1alpha1.Monitor) error {
 	return nil
 }
 
-func (o *Operator) handleMonitor(iObj interface{}) error {
-	obj := iObj.(*v1alpha1.Monitor)
+func (o *Operator) handleMonitor(key string) error {
+	// Convert the namespace/name string into a distinct namespace and name
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return fmt.Errorf("Invalid Resource Key for Monitor: %s", key)
+	}
+
+	obj, err := o.imClient.Ingressmonitor().Monitors(namespace).
+		Get(name, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// item might have been deleted by now, ignore it
+			return nil
+		}
+
+		return fmt.Errorf("Error fetching the Monitor for %s: %s", key, err)
+	}
+
+	if err := o.garbageCollectMonitors(obj); err != nil {
+		return fmt.Errorf("Error doing garbage collection for %s:%s: %s", obj.Namespace, obj.Name, err)
+	}
+
 	ingressList, err := o.kubeClient.Extensions().Ingresses(obj.Namespace).
 		List(listOptions(obj.Spec.Selector.MatchLabels))
 	if err != nil {

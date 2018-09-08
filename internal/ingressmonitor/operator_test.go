@@ -18,15 +18,269 @@ import (
 	"k8s.io/client-go/kubernetes"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 )
 
-func namespaceKey(t *testing.T, obj interface{}) string {
-	key, err := cache.MetaNamespaceKeyFunc(obj)
-	if err != nil {
-		t.Fatalf("Could not get NamespaceKey for object %#v", obj)
+func TestOperator_HandleNextItem(t *testing.T) {
+	op, _ := NewOperator(nil, nil, "", time.Minute, nil)
+	var queue workqueue.RateLimitingInterface
+	setup := func() {
+		queue = workqueue.NewNamedRateLimitingQueue(
+			workqueue.NewItemExponentialFailureRateLimiter(0, 0),
+			"Tests",
+		)
 	}
 
-	return key
+	t.Run("with a shut down queue", func(t *testing.T) {
+		setup()
+
+		queue.ShutDown()
+
+		if op.handleNextItem("test", queue, nil) {
+			t.Errorf("Expected not to want to handle next item, got true")
+		}
+	})
+
+	t.Run("with a non string object in the queue", func(t *testing.T) {
+		setup()
+
+		queue.Add(struct{}{})
+
+		if queue.Len() != 1 {
+			t.Fatalf("Expected 1 item to be added to the queue")
+		}
+
+		if !op.handleNextItem("test", queue, nil) {
+			t.Errorf("Expected to want to proceed processing objects")
+		}
+
+		if queue.Len() != 0 {
+			t.Errorf("Expected object to be removed from the queue")
+		}
+	})
+
+	t.Run("with an error handling the object", func(t *testing.T) {
+		setup()
+
+		queue.Add("12345")
+
+		if queue.Len() != 1 {
+			t.Fatalf("Expected 1 item to be added to the queue")
+		}
+
+		handler := func(id string) error {
+			if id != "12345" {
+				t.Errorf("Expected ID to match, got %s", id)
+			}
+
+			return errors.New("Not handled!")
+		}
+
+		if !op.handleNextItem("test", queue, handler) {
+			t.Errorf("Expected to want to proceed processing objects")
+		}
+
+		if queue.Len() != 0 {
+			t.Errorf("Expected object to be removed from the queue")
+		}
+	})
+}
+
+func TestOperator_OnAddUpdate_IngressMonitor(t *testing.T) {
+	t.Run("with error in handling func", func(t *testing.T) {
+		// the handler errors when there is no provider, use that!
+		crd := &v1alpha1.IngressMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-im",
+				Namespace: "testing",
+			},
+			Spec: v1alpha1.IngressMonitorSpec{
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
+				},
+			},
+		}
+
+		fact := provider.NewFactory(nil)
+		crdClient := imfake.NewSimpleClientset(crd)
+		op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
+		op.ingressMonitorQueue = workqueue.NewNamedRateLimitingQueue(
+			workqueue.NewItemExponentialFailureRateLimiter(0, 0),
+			"IngressMonitors",
+		)
+
+		op.OnAdd(crd)
+
+		if op.ingressMonitorQueue.Len() != 1 {
+			t.Errorf("Expected 1 item in the queue, got %d", op.ingressMonitorQueue.Len())
+		}
+
+		// process the item
+		if ok := op.processNextIngressMonitor(); ok {
+			t.Errorf("Expected IngressMonitor not to be processed")
+		}
+
+		if op.ingressMonitorQueue.Len() != 0 {
+			t.Errorf("Expected 0 items in the queue, got %d", op.ingressMonitorQueue.Len())
+		}
+	})
+
+	t.Run("with everything set up", func(t *testing.T) {
+		crd := &v1alpha1.IngressMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-im",
+				Namespace: "testing",
+			},
+			Spec: v1alpha1.IngressMonitorSpec{
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
+				},
+			},
+		}
+
+		prov := new(fake.SimpleProvider)
+		prov.CreateFunc = func(v1alpha1.MonitorTemplateSpec) (string, error) {
+			return "1234", nil
+		}
+		prov.UpdateFunc = func(id string, sp v1alpha1.MonitorTemplateSpec) (string, error) {
+			return id, nil
+		}
+
+		fact := provider.NewFactory(nil)
+		fact.Register("simple", fake.FactoryFunc(prov))
+
+		crdClient := imfake.NewSimpleClientset(crd)
+		op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
+		op.ingressMonitorQueue = workqueue.NewNamedRateLimitingQueue(
+			workqueue.NewItemExponentialFailureRateLimiter(0, 0),
+			"IngressMonitors",
+		)
+
+		t.Run("add ingress monitor", func(t *testing.T) {
+			op.OnAdd(crd)
+
+			if op.ingressMonitorQueue.Len() != 1 {
+				t.Errorf("Expected 1 item in the queue, got %d", op.ingressMonitorQueue.Len())
+			}
+
+			// process the item
+			if ok := op.processNextIngressMonitor(); !ok {
+				t.Errorf("Expected IngressMonitor to be processed")
+			}
+
+			if op.ingressMonitorQueue.Len() != 0 {
+				t.Errorf("Expected 0 items in the queue, got %d", op.ingressMonitorQueue.Len())
+			}
+		})
+
+		t.Run("update ingress monitor", func(t *testing.T) {
+			op.OnUpdate(crd, crd)
+
+			if op.ingressMonitorQueue.Len() != 1 {
+				t.Errorf("Expected 1 item in the queue, got %d", op.ingressMonitorQueue.Len())
+			}
+
+			// process the item
+			if ok := op.processNextIngressMonitor(); !ok {
+				t.Errorf("Expected IngressMonitor to be processed")
+			}
+
+			if op.ingressMonitorQueue.Len() != 0 {
+				t.Errorf("Expected 0 items in the queue, got %d", op.ingressMonitorQueue.Len())
+			}
+		})
+	})
+}
+
+func Test_OnAddUpdate_Monitor(t *testing.T) {
+	crd := &v1alpha1.Monitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-monitor",
+			Namespace: "testing",
+		},
+		Spec: v1alpha1.MonitorSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"team": "gophers",
+				},
+			},
+			Provider: v1.LocalObjectReference{
+				Name: "test-provider",
+			},
+			Template: v1.LocalObjectReference{
+				Name: "test-template",
+			},
+		},
+	}
+
+	t.Run("with everything set up", func(t *testing.T) {
+		prov := &v1alpha1.Provider{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-provider",
+				Namespace: "testing",
+			},
+		}
+		tpl := &v1alpha1.MonitorTemplate{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-template",
+				Namespace: "testing",
+			},
+			Spec: v1alpha1.MonitorTemplateSpec{
+				Type: "HTTP",
+				HTTP: &v1alpha1.HTTPTemplate{},
+			},
+		}
+
+		k8sClient := k8sfake.NewSimpleClientset()
+		crdClient := imfake.NewSimpleClientset(crd, prov, tpl)
+
+		fact := provider.NewFactory(nil)
+		op, _ := NewOperator(k8sClient, crdClient, "", time.Minute, fact)
+		op.monitorQueue = workqueue.NewNamedRateLimitingQueue(
+			workqueue.NewItemExponentialFailureRateLimiter(0, 0),
+			"Monitors",
+		)
+
+		t.Run("add monitor", func(t *testing.T) {
+			op.OnAdd(crd)
+
+			if op.monitorQueue.Len() != 1 {
+				t.Errorf("Expected 1 item in the queue, got %d", op.monitorQueue.Len())
+			}
+
+			// process the item
+			if ok := op.processNextMonitor(); !ok {
+				t.Errorf("Expected Monitor to be processed")
+			}
+
+			if op.monitorQueue.Len() != 0 {
+				t.Errorf("Expected 0 items in the queue, got %d", op.monitorQueue.Len())
+			}
+		})
+
+		t.Run("update monitor", func(t *testing.T) {
+			op.OnUpdate(crd, crd)
+
+			if op.monitorQueue.Len() != 1 {
+				t.Errorf("Expected 1 item in the queue, got %d", op.ingressMonitorQueue.Len())
+			}
+
+			// process the item
+			if ok := op.processNextMonitor(); !ok {
+				t.Errorf("Expected Monitor to be processed")
+			}
+
+			if op.monitorQueue.Len() != 0 {
+				t.Errorf("Expected 0 items in the queue, got %d", op.monitorQueue.Len())
+			}
+		})
+	})
 }
 
 func TestOperator_HandleIngressMonitor(t *testing.T) {
@@ -759,4 +1013,13 @@ func TestOperator_HandleMonitor(t *testing.T) {
 
 func ptrString(s string) *string {
 	return &s
+}
+
+func namespaceKey(t *testing.T, obj interface{}) string {
+	key, err := cache.MetaNamespaceKeyFunc(obj)
+	if err != nil {
+		t.Fatalf("Could not get NamespaceKey for object %#v", obj)
+	}
+
+	return key
 }

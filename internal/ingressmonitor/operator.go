@@ -19,7 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -110,7 +109,7 @@ func (o *Operator) processNextIngressMonitor() bool {
 }
 
 func (o *Operator) processNextMonitor() bool {
-	return o.handleNextItem("Monitors", o.ingressMonitorQueue, o.handleMonitor)
+	return o.handleNextItem("Monitors", o.monitorQueue, o.handleMonitor)
 }
 
 func (o *Operator) handleNextItem(name string, queue workqueue.RateLimitingInterface, handlerFunc func(string) error) bool {
@@ -144,7 +143,6 @@ func (o *Operator) handleNextItem(name string, queue workqueue.RateLimitingInter
 
 	if err != nil {
 		log.Printf(err.Error())
-		return false
 	}
 
 	return true
@@ -154,7 +152,6 @@ func (o *Operator) enqueueItem(queue workqueue.RateLimitingInterface, obj interf
 	var key string
 	var err error
 	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
-		runtime.HandleError(err)
 		return
 	}
 

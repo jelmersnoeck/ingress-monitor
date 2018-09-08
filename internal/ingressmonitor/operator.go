@@ -19,8 +19,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 
 	"github.com/dchest/blake2b"
@@ -41,6 +45,9 @@ type Operator struct {
 
 	imInformer      externalversions.SharedInformerFactory
 	providerFactory provider.FactoryInterface
+
+	monitorQueue        workqueue.RateLimitingInterface
+	ingressMonitorQueue workqueue.RateLimitingInterface
 }
 
 // NewOperator sets up a new IngressMonitor Operator which will watch for
@@ -54,10 +61,12 @@ func NewOperator(
 	crdscheme.AddToScheme(scheme.Scheme)
 
 	op := &Operator{
-		kubeClient:      kc,
-		imClient:        imc,
-		imInformer:      externalversions.NewSharedInformerFactory(imc, resync),
-		providerFactory: providerFactory,
+		kubeClient:          kc,
+		imClient:            imc,
+		imInformer:          externalversions.NewSharedInformerFactory(imc, resync),
+		providerFactory:     providerFactory,
+		monitorQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Monitors"),
+		ingressMonitorQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "IngressMonitors"),
 	}
 
 	// Add EventHandlers for all objects we want to track
@@ -69,10 +78,18 @@ func NewOperator(
 
 // Run starts the Operator and blocks until a message is received on stopCh.
 func (o *Operator) Run(stopCh <-chan struct{}) error {
+	defer o.monitorQueue.ShutDown()
+	defer o.ingressMonitorQueue.ShutDown()
+
 	log.Printf("Starting IngressMonitor Operator")
 
 	log.Printf("Starting the informers")
 	o.imInformer.Start(stopCh)
+
+	log.Printf("Starting the workers")
+	for i := 0; i < 4; i++ {
+		go wait.Until(runWorker(o.processNextIngressMonitor), time.Second, stopCh)
+	}
 
 	<-stopCh
 	log.Printf("Stopping IngressMonitor Operator")
@@ -80,14 +97,75 @@ func (o *Operator) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
+func runWorker(queue func() bool) func() {
+	return func() {
+		for queue() {
+		}
+	}
+}
+
+func (o *Operator) processNextIngressMonitor() bool {
+	return o.handleNextItem("IngressMonitors", o.ingressMonitorQueue, o.handleIngressMonitor)
+}
+
+func (o *Operator) handleNextItem(name string, queue workqueue.RateLimitingInterface, handlerFunc func(string) error) bool {
+	obj, shutdown := queue.Get()
+
+	if shutdown {
+		return false
+	}
+
+	// wrap this in a function so we can use defer to mark processing the item
+	// as done.
+	err := func(obj interface{}) error {
+		defer queue.Done(obj)
+		var key string
+		var ok bool
+		if key, ok = obj.(string); !ok {
+			queue.Forget(obj)
+
+			log.Printf("Expected object name in %s workqueue, got %#v", name, obj)
+			return nil
+		}
+
+		if err := handlerFunc(key); err != nil {
+			return fmt.Errorf("Error handling '%s' in %s workqueue: %s", key, name, err)
+		}
+
+		queue.Forget(obj)
+		log.Printf("Processed '%s' in %s workqueue", key, name)
+		return nil
+	}(obj)
+
+	if err != nil {
+		log.Printf(err.Error())
+		return false
+	}
+
+	return true
+}
+
+func (o *Operator) enqueueItem(queue workqueue.RateLimitingInterface, obj interface{}) {
+	var key string
+	var err error
+	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+		runtime.HandleError(err)
+		return
+	}
+
+	queue.AddRateLimited(key)
+}
+
+func (o *Operator) enqueueIngressMonitor(im *v1alpha1.IngressMonitor) {
+	o.enqueueItem(o.ingressMonitorQueue, im)
+}
+
 // OnAdd handles adding of IngressMonitors and Ingresses and sets up the
 // appropriate monitor with the configured providers.
 func (o *Operator) OnAdd(obj interface{}) {
 	switch obj := obj.(type) {
 	case *v1alpha1.IngressMonitor:
-		if err := o.handleIngressMonitor(obj); err != nil {
-			log.Printf("Error adding IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
-		}
+		o.enqueueIngressMonitor(obj)
 	case *v1alpha1.Monitor:
 		if err := o.handleMonitor(obj); err != nil {
 			log.Printf("Error adding Monitor %s:%s: %s", obj.Namespace, obj.Name, err)
@@ -100,9 +178,7 @@ func (o *Operator) OnAdd(obj interface{}) {
 func (o *Operator) OnUpdate(old, new interface{}) {
 	switch obj := new.(type) {
 	case *v1alpha1.IngressMonitor:
-		if err := o.handleIngressMonitor(obj); err != nil {
-			log.Printf("Error updating IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
-		}
+		o.enqueueIngressMonitor(obj)
 	case *v1alpha1.Monitor:
 		// GC old objects, we do this on every run - even resyncs - so we can be
 		// sure that even when an Ingress changes it's spec, we update our
@@ -151,10 +227,27 @@ func (o *Operator) OnDelete(obj interface{}) {
 
 // handleIngressMonitor handles IngressMonitors in a way that it knows how to
 // deal with creating and updating resources.
-func (o *Operator) handleIngressMonitor(obj *v1alpha1.IngressMonitor) error {
+func (o *Operator) handleIngressMonitor(key string) error {
+	// Convert the namespace/name string into a distinct namespace and name
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return fmt.Errorf("Invalid Resource Key for IngressMonitor: %s", key)
+	}
+
+	obj, err := o.imClient.Ingressmonitor().IngressMonitors(namespace).
+		Get(name, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// item might have been deleted by now, ignore it
+			return nil
+		}
+
+		return fmt.Errorf("Error fetching the IngressMonitor for %s: %s", key, err)
+	}
+
 	cl, err := o.providerFactory.From(obj.Spec.Provider)
 	if err != nil {
-		return err
+		return fmt.Errorf("Error fetching provider '%s': %s", obj.Spec.Provider.Type, err)
 	}
 
 	var id string
@@ -238,7 +331,8 @@ func (o *Operator) garbageCollectMonitors(obj *v1alpha1.Monitor) error {
 	return nil
 }
 
-func (o *Operator) handleMonitor(obj *v1alpha1.Monitor) error {
+func (o *Operator) handleMonitor(iObj interface{}) error {
+	obj := iObj.(*v1alpha1.Monitor)
 	ingressList, err := o.kubeClient.Extensions().Ingresses(obj.Namespace).
 		List(listOptions(obj.Spec.Selector.MatchLabels))
 	if err != nil {

@@ -87,31 +87,40 @@ func TestOperator_HandleNextItem(t *testing.T) {
 }
 
 func TestOperator_OnAddUpdate_IngressMonitor(t *testing.T) {
-	t.Run("with error in handling func", func(t *testing.T) {
-		// the handler errors when there is no provider, use that!
-		crd := &v1alpha1.IngressMonitor{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-im",
+	crd := &v1alpha1.IngressMonitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-im",
+			Namespace: "testing",
+		},
+		Spec: v1alpha1.IngressMonitorSpec{
+			Provider: v1alpha1.NamespacedProvider{
 				Namespace: "testing",
-			},
-			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.NamespacedProvider{
-					Namespace: "testing",
-					ProviderSpec: v1alpha1.ProviderSpec{
-						Type: "simple",
-					},
+				ProviderSpec: v1alpha1.ProviderSpec{
+					Type: "simple",
 				},
 			},
-		}
+		},
+	}
 
-		fact := provider.NewFactory(nil)
-		crdClient := imfake.NewSimpleClientset(crd)
-		op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
-		op.ingressMonitorQueue = workqueue.NewNamedRateLimitingQueue(
-			workqueue.NewItemExponentialFailureRateLimiter(0, 0),
-			"IngressMonitors",
-		)
+	prov := new(fake.SimpleProvider)
+	prov.CreateFunc = func(v1alpha1.MonitorTemplateSpec) (string, error) {
+		return "1234", nil
+	}
+	prov.UpdateFunc = func(id string, sp v1alpha1.MonitorTemplateSpec) (string, error) {
+		return id, nil
+	}
 
+	fact := provider.NewFactory(nil)
+	fact.Register("simple", fake.FactoryFunc(prov))
+
+	crdClient := imfake.NewSimpleClientset(crd)
+	op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
+	op.ingressMonitorQueue = workqueue.NewNamedRateLimitingQueue(
+		workqueue.NewItemExponentialFailureRateLimiter(0, 0),
+		"IngressMonitors",
+	)
+
+	t.Run("add ingress monitor", func(t *testing.T) {
 		op.OnAdd(crd)
 
 		if op.ingressMonitorQueue.Len() != 1 {
@@ -119,8 +128,8 @@ func TestOperator_OnAddUpdate_IngressMonitor(t *testing.T) {
 		}
 
 		// process the item
-		if ok := op.processNextIngressMonitor(); ok {
-			t.Errorf("Expected IngressMonitor not to be processed")
+		if ok := op.processNextIngressMonitor(); !ok {
+			t.Errorf("Expected IngressMonitor to be processed")
 		}
 
 		if op.ingressMonitorQueue.Len() != 0 {
@@ -128,73 +137,21 @@ func TestOperator_OnAddUpdate_IngressMonitor(t *testing.T) {
 		}
 	})
 
-	t.Run("with everything set up", func(t *testing.T) {
-		crd := &v1alpha1.IngressMonitor{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-im",
-				Namespace: "testing",
-			},
-			Spec: v1alpha1.IngressMonitorSpec{
-				Provider: v1alpha1.NamespacedProvider{
-					Namespace: "testing",
-					ProviderSpec: v1alpha1.ProviderSpec{
-						Type: "simple",
-					},
-				},
-			},
+	t.Run("update ingress monitor", func(t *testing.T) {
+		op.OnUpdate(crd, crd)
+
+		if op.ingressMonitorQueue.Len() != 1 {
+			t.Errorf("Expected 1 item in the queue, got %d", op.ingressMonitorQueue.Len())
 		}
 
-		prov := new(fake.SimpleProvider)
-		prov.CreateFunc = func(v1alpha1.MonitorTemplateSpec) (string, error) {
-			return "1234", nil
-		}
-		prov.UpdateFunc = func(id string, sp v1alpha1.MonitorTemplateSpec) (string, error) {
-			return id, nil
+		// process the item
+		if ok := op.processNextIngressMonitor(); !ok {
+			t.Errorf("Expected IngressMonitor to be processed")
 		}
 
-		fact := provider.NewFactory(nil)
-		fact.Register("simple", fake.FactoryFunc(prov))
-
-		crdClient := imfake.NewSimpleClientset(crd)
-		op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
-		op.ingressMonitorQueue = workqueue.NewNamedRateLimitingQueue(
-			workqueue.NewItemExponentialFailureRateLimiter(0, 0),
-			"IngressMonitors",
-		)
-
-		t.Run("add ingress monitor", func(t *testing.T) {
-			op.OnAdd(crd)
-
-			if op.ingressMonitorQueue.Len() != 1 {
-				t.Errorf("Expected 1 item in the queue, got %d", op.ingressMonitorQueue.Len())
-			}
-
-			// process the item
-			if ok := op.processNextIngressMonitor(); !ok {
-				t.Errorf("Expected IngressMonitor to be processed")
-			}
-
-			if op.ingressMonitorQueue.Len() != 0 {
-				t.Errorf("Expected 0 items in the queue, got %d", op.ingressMonitorQueue.Len())
-			}
-		})
-
-		t.Run("update ingress monitor", func(t *testing.T) {
-			op.OnUpdate(crd, crd)
-
-			if op.ingressMonitorQueue.Len() != 1 {
-				t.Errorf("Expected 1 item in the queue, got %d", op.ingressMonitorQueue.Len())
-			}
-
-			// process the item
-			if ok := op.processNextIngressMonitor(); !ok {
-				t.Errorf("Expected IngressMonitor to be processed")
-			}
-
-			if op.ingressMonitorQueue.Len() != 0 {
-				t.Errorf("Expected 0 items in the queue, got %d", op.ingressMonitorQueue.Len())
-			}
-		})
+		if op.ingressMonitorQueue.Len() != 0 {
+			t.Errorf("Expected 0 items in the queue, got %d", op.ingressMonitorQueue.Len())
+		}
 	})
 }
 
@@ -219,67 +176,65 @@ func Test_OnAddUpdate_Monitor(t *testing.T) {
 		},
 	}
 
-	t.Run("with everything set up", func(t *testing.T) {
-		prov := &v1alpha1.Provider{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-provider",
-				Namespace: "testing",
-			},
+	prov := &v1alpha1.Provider{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-provider",
+			Namespace: "testing",
+		},
+	}
+	tpl := &v1alpha1.MonitorTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-template",
+			Namespace: "testing",
+		},
+		Spec: v1alpha1.MonitorTemplateSpec{
+			Type: "HTTP",
+			HTTP: &v1alpha1.HTTPTemplate{},
+		},
+	}
+
+	k8sClient := k8sfake.NewSimpleClientset()
+	crdClient := imfake.NewSimpleClientset(crd, prov, tpl)
+
+	fact := provider.NewFactory(nil)
+	op, _ := NewOperator(k8sClient, crdClient, "", time.Minute, fact)
+	op.monitorQueue = workqueue.NewNamedRateLimitingQueue(
+		workqueue.NewItemExponentialFailureRateLimiter(0, 0),
+		"Monitors",
+	)
+
+	t.Run("add monitor", func(t *testing.T) {
+		op.OnAdd(crd)
+
+		if op.monitorQueue.Len() != 1 {
+			t.Errorf("Expected 1 item in the queue, got %d", op.monitorQueue.Len())
 		}
-		tpl := &v1alpha1.MonitorTemplate{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-template",
-				Namespace: "testing",
-			},
-			Spec: v1alpha1.MonitorTemplateSpec{
-				Type: "HTTP",
-				HTTP: &v1alpha1.HTTPTemplate{},
-			},
+
+		// process the item
+		if ok := op.processNextMonitor(); !ok {
+			t.Errorf("Expected Monitor to be processed")
 		}
 
-		k8sClient := k8sfake.NewSimpleClientset()
-		crdClient := imfake.NewSimpleClientset(crd, prov, tpl)
+		if op.monitorQueue.Len() != 0 {
+			t.Errorf("Expected 0 items in the queue, got %d", op.monitorQueue.Len())
+		}
+	})
 
-		fact := provider.NewFactory(nil)
-		op, _ := NewOperator(k8sClient, crdClient, "", time.Minute, fact)
-		op.monitorQueue = workqueue.NewNamedRateLimitingQueue(
-			workqueue.NewItemExponentialFailureRateLimiter(0, 0),
-			"Monitors",
-		)
+	t.Run("update monitor", func(t *testing.T) {
+		op.OnUpdate(crd, crd)
 
-		t.Run("add monitor", func(t *testing.T) {
-			op.OnAdd(crd)
+		if op.monitorQueue.Len() != 1 {
+			t.Errorf("Expected 1 item in the queue, got %d", op.ingressMonitorQueue.Len())
+		}
 
-			if op.monitorQueue.Len() != 1 {
-				t.Errorf("Expected 1 item in the queue, got %d", op.monitorQueue.Len())
-			}
+		// process the item
+		if ok := op.processNextMonitor(); !ok {
+			t.Errorf("Expected Monitor to be processed")
+		}
 
-			// process the item
-			if ok := op.processNextMonitor(); !ok {
-				t.Errorf("Expected Monitor to be processed")
-			}
-
-			if op.monitorQueue.Len() != 0 {
-				t.Errorf("Expected 0 items in the queue, got %d", op.monitorQueue.Len())
-			}
-		})
-
-		t.Run("update monitor", func(t *testing.T) {
-			op.OnUpdate(crd, crd)
-
-			if op.monitorQueue.Len() != 1 {
-				t.Errorf("Expected 1 item in the queue, got %d", op.ingressMonitorQueue.Len())
-			}
-
-			// process the item
-			if ok := op.processNextMonitor(); !ok {
-				t.Errorf("Expected Monitor to be processed")
-			}
-
-			if op.monitorQueue.Len() != 0 {
-				t.Errorf("Expected 0 items in the queue, got %d", op.monitorQueue.Len())
-			}
-		})
+		if op.monitorQueue.Len() != 0 {
+			t.Errorf("Expected 0 items in the queue, got %d", op.monitorQueue.Len())
+		}
 	})
 }
 

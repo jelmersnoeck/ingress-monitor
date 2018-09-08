@@ -137,7 +137,7 @@ func (o *Operator) handleNextItem(name string, queue workqueue.RateLimitingInter
 		}
 
 		queue.Forget(obj)
-		log.Printf("Processed '%s' in %s workqueue", key, name)
+		log.Printf("Synced '%s' in %s workqueue", key, name)
 		return nil
 	}(obj)
 

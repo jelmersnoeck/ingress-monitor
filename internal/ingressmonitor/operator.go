@@ -235,12 +235,7 @@ func (o *Operator) handleIngressMonitor(key string) error {
 	obj, err := o.imClient.Ingressmonitor().IngressMonitors(namespace).
 		Get(name, metav1.GetOptions{})
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// item might have been deleted by now, ignore it
-			return nil
-		}
-
-		return fmt.Errorf("Error fetching the IngressMonitor for %s: %s", key, err)
+		return err
 	}
 
 	cl, err := o.providerFactory.From(obj.Spec.Provider)
@@ -339,12 +334,7 @@ func (o *Operator) handleMonitor(key string) error {
 	obj, err := o.imClient.Ingressmonitor().Monitors(namespace).
 		Get(name, metav1.GetOptions{})
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// item might have been deleted by now, ignore it
-			return nil
-		}
-
-		return fmt.Errorf("Error fetching the Monitor for %s: %s", key, err)
+		return err
 	}
 
 	if err := o.garbageCollectMonitors(obj); err != nil {

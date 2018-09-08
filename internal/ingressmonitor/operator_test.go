@@ -13,6 +13,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
@@ -29,291 +30,208 @@ func namespaceKey(t *testing.T, obj interface{}) string {
 }
 
 func TestOperator_HandleIngressMonitor(t *testing.T) {
-	t.Run("creating", func(t *testing.T) {
-		t.Run("without registered provider", func(t *testing.T) {
-			fact := provider.NewFactory(nil)
+	t.Run("creating a new test with the provider", func(t *testing.T) {
+		fact := provider.NewFactory(nil)
 
-			crd := &v1alpha1.IngressMonitor{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-im",
+		prov := new(fake.SimpleProvider)
+		prov.CreateFunc = func(v1alpha1.MonitorTemplateSpec) (string, error) {
+			return "1234", nil
+		}
+
+		fact.Register("simple", fake.FactoryFunc(prov))
+
+		crd := &v1alpha1.IngressMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-im",
+				Namespace: "testing",
+			},
+			Spec: v1alpha1.IngressMonitorSpec{
+				Provider: v1alpha1.NamespacedProvider{
 					Namespace: "testing",
-				},
-				Spec: v1alpha1.IngressMonitorSpec{
-					Provider: v1alpha1.NamespacedProvider{
-						Namespace: "testing",
-						ProviderSpec: v1alpha1.ProviderSpec{
-							Type: "test",
-						},
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
 					},
 				},
-			}
+			},
+		}
 
-			crdClient := imfake.NewSimpleClientset(crd)
-			op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
+		crdClient := imfake.NewSimpleClientset(crd)
+		op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
 
-			expErr := errors.New("Error fetching provider 'test': the specified provider can't be found")
-			if err := op.handleIngressMonitor(namespaceKey(t, crd)); err.Error() != expErr.Error() {
-				t.Errorf("Expected '%s' error, got '%s'", expErr, err)
-			}
-		})
+		if err := op.handleIngressMonitor(namespaceKey(t, crd)); err != nil {
+			t.Errorf("Expected no error, got %s", err)
+		}
 
-		t.Run("with error creating monitor", func(t *testing.T) {
-			fact := provider.NewFactory(nil)
+		if prov.CreateCount != 1 {
+			t.Errorf("Expected Create to be called once, got %d", prov.CreateCount)
+		}
 
-			err := errors.New("my-provider-error")
-			prov := new(fake.SimpleProvider)
-			prov.CreateFunc = func(v1alpha1.MonitorTemplateSpec) (string, error) {
-				return "", err
-			}
+		crd, err := crdClient.Ingressmonitor().IngressMonitors(crd.Namespace).Get(crd.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Expected no error fetching the CRD, got %s", err)
+		}
 
-			fact.Register("simple", fake.FactoryFunc(prov))
-
-			crd := &v1alpha1.IngressMonitor{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-im",
-					Namespace: "testing",
-				},
-				Spec: v1alpha1.IngressMonitorSpec{
-					Provider: v1alpha1.NamespacedProvider{
-						Namespace: "testing",
-						ProviderSpec: v1alpha1.ProviderSpec{
-							Type: "simple",
-						},
-					},
-				},
-			}
-
-			crdClient := imfake.NewSimpleClientset(crd)
-			op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
-
-			if handleErr := op.handleIngressMonitor(namespaceKey(t, crd)); err != handleErr {
-				t.Errorf("Expected error '%s', got %s", err, handleErr)
-			}
-
-			if prov.CreateCount != 1 {
-				t.Errorf("Expected Create to be called once, got %d", prov.CreateCount)
-			}
-		})
-
-		t.Run("without errors", func(t *testing.T) {
-			fact := provider.NewFactory(nil)
-
-			prov := new(fake.SimpleProvider)
-			prov.CreateFunc = func(v1alpha1.MonitorTemplateSpec) (string, error) {
-				return "1234", nil
-			}
-
-			fact.Register("simple", fake.FactoryFunc(prov))
-
-			crd := &v1alpha1.IngressMonitor{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-im",
-					Namespace: "testing",
-				},
-				Spec: v1alpha1.IngressMonitorSpec{
-					Provider: v1alpha1.NamespacedProvider{
-						Namespace: "testing",
-						ProviderSpec: v1alpha1.ProviderSpec{
-							Type: "simple",
-						},
-					},
-				},
-			}
-
-			crdClient := imfake.NewSimpleClientset(crd)
-			op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
-
-			if err := op.handleIngressMonitor(namespaceKey(t, crd)); err != nil {
-				t.Errorf("Expected no error, got %s", err)
-			}
-
-			if prov.CreateCount != 1 {
-				t.Errorf("Expected Create to be called once, got %d", prov.CreateCount)
-			}
-
-			crd, err := crdClient.Ingressmonitor().IngressMonitors(crd.Namespace).Get(crd.Name, metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("Expected no error fetching the CRD, got %s", err)
-			}
-
-			if crd.Status.ID != "1234" {
-				t.Errorf("Expected status to be updated")
-			}
-		})
-
-		t.Run("with ID already set", func(t *testing.T) {
-			fact := provider.NewFactory(nil)
-
-			prov := new(fake.SimpleProvider)
-			fact.Register("simple", fake.FactoryFunc(prov))
-
-			prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) (string, error) {
-				if status != "1234" {
-					t.Errorf("Expected status to be `1234`, got `%s`", status)
-				}
-				return status, nil
-			}
-
-			crd := &v1alpha1.IngressMonitor{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-im",
-					Namespace: "testing",
-				},
-				Spec: v1alpha1.IngressMonitorSpec{
-					Provider: v1alpha1.NamespacedProvider{
-						Namespace: "testing",
-						ProviderSpec: v1alpha1.ProviderSpec{
-							Type: "simple",
-						},
-					},
-				},
-				Status: v1alpha1.IngressMonitorStatus{
-					ID: "1234",
-				},
-			}
-
-			crdClient := imfake.NewSimpleClientset(crd)
-			op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
-
-			if err := op.handleIngressMonitor(namespaceKey(t, crd)); err != nil {
-				t.Errorf("Expected no error, got %s", err)
-			}
-
-			if prov.CreateCount != 0 {
-				t.Errorf("Did not expect an object to be created, got a create call")
-			}
-
-			if prov.UpdateCount != 1 {
-				t.Errorf("Expected provider to do one update, got %d", prov.UpdateCount)
-			}
-		})
+		if crd.Status.ID != "1234" {
+			t.Errorf("Expected status to be updated")
+		}
 	})
 
-	t.Run("updating", func(t *testing.T) {
-		t.Run("without registered provider", func(t *testing.T) {
-			fact := provider.NewFactory(nil)
+	t.Run("with the item already deleted from the server", func(t *testing.T) {
+		// this can happen when we had to queue for a while and the item has
+		// been deleted in the meantime. We want to ensure it's handled
+		// gracefully.
+		fact := provider.NewFactory(nil)
 
-			prov := new(fake.SimpleProvider)
-			fact.Register("simple", fake.FactoryFunc(prov))
+		prov := new(fake.SimpleProvider)
+		fact.Register("simple", fake.FactoryFunc(prov))
 
-			crd := &v1alpha1.IngressMonitor{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-im",
+		crd := &v1alpha1.IngressMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-im",
+				Namespace: "testing",
+			},
+			Spec: v1alpha1.IngressMonitorSpec{
+				Provider: v1alpha1.NamespacedProvider{
 					Namespace: "testing",
-				},
-				Spec: v1alpha1.IngressMonitorSpec{
-					Provider: v1alpha1.NamespacedProvider{
-						Namespace: "testing",
-						ProviderSpec: v1alpha1.ProviderSpec{
-							Type: "test",
-						},
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
 					},
 				},
-			}
+			},
+		}
 
-			crdClient := imfake.NewSimpleClientset(crd)
-			op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
+		// we'll never register the item, simulating that it's been deleted
+		crdClient := imfake.NewSimpleClientset()
+		op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
 
-			expErr := errors.New("Error fetching provider 'test': the specified provider can't be found")
-			if err := op.handleIngressMonitor(namespaceKey(t, crd)); err.Error() != expErr.Error() {
-				t.Errorf("Expected error '%s', got '%s'", expErr, err)
-			}
+		if err := op.handleIngressMonitor(namespaceKey(t, crd)); !kerrors.IsNotFound(err) {
+			t.Errorf("Expected no error, got %s", err)
+		}
+	})
 
-			if prov.UpdateCount != 0 {
-				t.Errorf("Expected no updates, got %d", prov.UpdateCount)
-			}
+	t.Run("without registered provider", func(t *testing.T) {
+		fact := provider.NewFactory(nil)
 
-			if prov.CreateCount != 0 {
-				t.Errorf("Expected no updates, got %d", prov.UpdateCount)
-			}
-		})
+		prov := new(fake.SimpleProvider)
+		fact.Register("simple", fake.FactoryFunc(prov))
 
-		t.Run("with error updating monitor", func(t *testing.T) {
-			fact := provider.NewFactory(nil)
-
-			err := errors.New("my-provider-error")
-			prov := new(fake.SimpleProvider)
-			prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) (string, error) {
-				if status != "12345" {
-					t.Errorf("Expected status to be `12345`, got `%s`", status)
-				}
-				return status, err
-			}
-
-			fact.Register("simple", fake.FactoryFunc(prov))
-
-			crd := &v1alpha1.IngressMonitor{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-im",
+		crd := &v1alpha1.IngressMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-im",
+				Namespace: "testing",
+			},
+			Spec: v1alpha1.IngressMonitorSpec{
+				Provider: v1alpha1.NamespacedProvider{
 					Namespace: "testing",
-				},
-				Spec: v1alpha1.IngressMonitorSpec{
-					Provider: v1alpha1.NamespacedProvider{
-						Namespace: "testing",
-						ProviderSpec: v1alpha1.ProviderSpec{
-							Type: "simple",
-						},
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "test",
 					},
 				},
-				Status: v1alpha1.IngressMonitorStatus{
-					ID: "12345",
-				},
+			},
+		}
+
+		crdClient := imfake.NewSimpleClientset(crd)
+		op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
+
+		expErr := errors.New("Error fetching provider 'test': the specified provider can't be found")
+		if err := op.handleIngressMonitor(namespaceKey(t, crd)); err.Error() != expErr.Error() {
+			t.Errorf("Expected error '%s', got '%s'", expErr, err)
+		}
+
+		if prov.UpdateCount != 0 {
+			t.Errorf("Expected no updates, got %d", prov.UpdateCount)
+		}
+
+		if prov.CreateCount != 0 {
+			t.Errorf("Expected no updates, got %d", prov.UpdateCount)
+		}
+	})
+
+	t.Run("with error updating monitor", func(t *testing.T) {
+		fact := provider.NewFactory(nil)
+
+		err := errors.New("my-provider-error")
+		prov := new(fake.SimpleProvider)
+		prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) (string, error) {
+			if status != "12345" {
+				t.Errorf("Expected status to be `12345`, got `%s`", status)
 			}
+			return status, err
+		}
 
-			crdClient := imfake.NewSimpleClientset(crd)
-			op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
+		fact.Register("simple", fake.FactoryFunc(prov))
 
-			if handleErr := op.handleIngressMonitor(namespaceKey(t, crd)); err != handleErr {
-				t.Errorf("Expected error '%s', got '%s'", err, handleErr)
-			}
-
-			if prov.UpdateCount != 1 {
-				t.Errorf("Expected Update to be called once, got %d", prov.UpdateCount)
-			}
-		})
-
-		t.Run("without errors", func(t *testing.T) {
-			fact := provider.NewFactory(nil)
-
-			prov := new(fake.SimpleProvider)
-			prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) (string, error) {
-				if status != "12345" {
-					t.Errorf("Expected status to be `12345`, got `%s`", status)
-				}
-				return status, nil
-			}
-
-			fact.Register("simple", fake.FactoryFunc(prov))
-
-			crd := &v1alpha1.IngressMonitor{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-im",
+		crd := &v1alpha1.IngressMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-im",
+				Namespace: "testing",
+			},
+			Spec: v1alpha1.IngressMonitorSpec{
+				Provider: v1alpha1.NamespacedProvider{
 					Namespace: "testing",
-				},
-				Spec: v1alpha1.IngressMonitorSpec{
-					Provider: v1alpha1.NamespacedProvider{
-						Namespace: "testing",
-						ProviderSpec: v1alpha1.ProviderSpec{
-							Type: "simple",
-						},
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
 					},
 				},
-				Status: v1alpha1.IngressMonitorStatus{
-					ID: "12345",
+			},
+			Status: v1alpha1.IngressMonitorStatus{
+				ID: "12345",
+			},
+		}
+
+		crdClient := imfake.NewSimpleClientset(crd)
+		op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
+
+		if handleErr := op.handleIngressMonitor(namespaceKey(t, crd)); err != handleErr {
+			t.Errorf("Expected error '%s', got '%s'", err, handleErr)
+		}
+
+		if prov.UpdateCount != 1 {
+			t.Errorf("Expected Update to be called once, got %d", prov.UpdateCount)
+		}
+	})
+
+	t.Run("without errors", func(t *testing.T) {
+		fact := provider.NewFactory(nil)
+
+		prov := new(fake.SimpleProvider)
+		prov.UpdateFunc = func(status string, _ v1alpha1.MonitorTemplateSpec) (string, error) {
+			if status != "12345" {
+				t.Errorf("Expected status to be `12345`, got `%s`", status)
+			}
+			return status, nil
+		}
+
+		fact.Register("simple", fake.FactoryFunc(prov))
+
+		crd := &v1alpha1.IngressMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-im",
+				Namespace: "testing",
+			},
+			Spec: v1alpha1.IngressMonitorSpec{
+				Provider: v1alpha1.NamespacedProvider{
+					Namespace: "testing",
+					ProviderSpec: v1alpha1.ProviderSpec{
+						Type: "simple",
+					},
 				},
-			}
+			},
+			Status: v1alpha1.IngressMonitorStatus{
+				ID: "12345",
+			},
+		}
 
-			crdClient := imfake.NewSimpleClientset(crd)
-			op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
+		crdClient := imfake.NewSimpleClientset(crd)
+		op, _ := NewOperator(nil, crdClient, "", time.Minute, fact)
 
-			if err := op.handleIngressMonitor(namespaceKey(t, crd)); err != nil {
-				t.Errorf("Expected no error, got %s", err)
-			}
+		if err := op.handleIngressMonitor(namespaceKey(t, crd)); err != nil {
+			t.Errorf("Expected no error, got %s", err)
+		}
 
-			if prov.UpdateCount != 1 {
-				t.Errorf("Expected Update to be called once, got %d", prov.UpdateCount)
-			}
-		})
+		if prov.UpdateCount != 1 {
+			t.Errorf("Expected Update to be called once, got %d", prov.UpdateCount)
+		}
 	})
 }
 
@@ -641,7 +559,7 @@ func TestOperator_HandleMonitor(t *testing.T) {
 				t.Fatalf("Could not delete Monitor: %s", err)
 			}
 
-			if err := op.handleMonitor(namespaceKey(t, mon)); err != nil {
+			if err := op.handleMonitor(namespaceKey(t, mon)); !kerrors.IsNotFound(err) {
 				t.Fatalf("Expected no error, got %s", err)
 			}
 

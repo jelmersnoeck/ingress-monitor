@@ -12,12 +12,11 @@ Provider and you have a [Monitor](./monitor.md)
 ```yaml
 # A MonitorTemplate is a reusable configuration for a type of monitor. It can be
 # referenced by a Monitor and can be reused for different types of Providers.
-# A MonitorTemplate is Cluster bound, meaning you don't have to specify a
-# namespace and it will be accessible from all namespaces.
 apiVersion: ingressmonitor.sphc.io/v1alpha1
 kind: MonitorTemplate
 metadata:
   name: go-apps
+  namespace: websites
 spec:
   # Required. The type of check we want to perform.
   type: HTTP

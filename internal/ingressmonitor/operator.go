@@ -354,7 +354,7 @@ func (o *Operator) handleMonitor(key string) error {
 	}
 
 	// fetch the referenced template
-	tmpl, err := o.imClient.Ingressmonitor().MonitorTemplates().
+	tmpl, err := o.imClient.Ingressmonitor().MonitorTemplates(obj.Namespace).
 		Get(obj.Spec.Template.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("Could not get MonitorTemplate: %s", err)

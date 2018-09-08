@@ -37,6 +37,7 @@ import (
 // FakeMonitorTemplates implements MonitorTemplateInterface
 type FakeMonitorTemplates struct {
 	Fake *FakeIngressmonitorV1alpha1
+	ns   string
 }
 
 var monitortemplatesResource = schema.GroupVersionResource{Group: "ingressmonitor.sphc.io", Version: "v1alpha1", Resource: "monitortemplates"}
@@ -46,7 +47,8 @@ var monitortemplatesKind = schema.GroupVersionKind{Group: "ingressmonitor.sphc.i
 // Get takes name of the monitorTemplate, and returns the corresponding monitorTemplate object, and an error if there is any.
 func (c *FakeMonitorTemplates) Get(name string, options v1.GetOptions) (result *v1alpha1.MonitorTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(monitortemplatesResource, name), &v1alpha1.MonitorTemplate{})
+		Invokes(testing.NewGetAction(monitortemplatesResource, c.ns, name), &v1alpha1.MonitorTemplate{})
+
 	if obj == nil {
 		return nil, err
 	}
@@ -56,7 +58,8 @@ func (c *FakeMonitorTemplates) Get(name string, options v1.GetOptions) (result *
 // List takes label and field selectors, and returns the list of MonitorTemplates that match those selectors.
 func (c *FakeMonitorTemplates) List(opts v1.ListOptions) (result *v1alpha1.MonitorTemplateList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(monitortemplatesResource, monitortemplatesKind, opts), &v1alpha1.MonitorTemplateList{})
+		Invokes(testing.NewListAction(monitortemplatesResource, monitortemplatesKind, c.ns, opts), &v1alpha1.MonitorTemplateList{})
+
 	if obj == nil {
 		return nil, err
 	}
@@ -77,13 +80,15 @@ func (c *FakeMonitorTemplates) List(opts v1.ListOptions) (result *v1alpha1.Monit
 // Watch returns a watch.Interface that watches the requested monitorTemplates.
 func (c *FakeMonitorTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(monitortemplatesResource, opts))
+		InvokesWatch(testing.NewWatchAction(monitortemplatesResource, c.ns, opts))
+
 }
 
 // Create takes the representation of a monitorTemplate and creates it.  Returns the server's representation of the monitorTemplate, and an error, if there is any.
 func (c *FakeMonitorTemplates) Create(monitorTemplate *v1alpha1.MonitorTemplate) (result *v1alpha1.MonitorTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(monitortemplatesResource, monitorTemplate), &v1alpha1.MonitorTemplate{})
+		Invokes(testing.NewCreateAction(monitortemplatesResource, c.ns, monitorTemplate), &v1alpha1.MonitorTemplate{})
+
 	if obj == nil {
 		return nil, err
 	}
@@ -93,7 +98,8 @@ func (c *FakeMonitorTemplates) Create(monitorTemplate *v1alpha1.MonitorTemplate)
 // Update takes the representation of a monitorTemplate and updates it. Returns the server's representation of the monitorTemplate, and an error, if there is any.
 func (c *FakeMonitorTemplates) Update(monitorTemplate *v1alpha1.MonitorTemplate) (result *v1alpha1.MonitorTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(monitortemplatesResource, monitorTemplate), &v1alpha1.MonitorTemplate{})
+		Invokes(testing.NewUpdateAction(monitortemplatesResource, c.ns, monitorTemplate), &v1alpha1.MonitorTemplate{})
+
 	if obj == nil {
 		return nil, err
 	}
@@ -103,13 +109,14 @@ func (c *FakeMonitorTemplates) Update(monitorTemplate *v1alpha1.MonitorTemplate)
 // Delete takes name of the monitorTemplate and deletes it. Returns an error if one occurs.
 func (c *FakeMonitorTemplates) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(monitortemplatesResource, name), &v1alpha1.MonitorTemplate{})
+		Invokes(testing.NewDeleteAction(monitortemplatesResource, c.ns, name), &v1alpha1.MonitorTemplate{})
+
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeMonitorTemplates) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(monitortemplatesResource, listOptions)
+	action := testing.NewDeleteCollectionAction(monitortemplatesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.MonitorTemplateList{})
 	return err
@@ -118,7 +125,8 @@ func (c *FakeMonitorTemplates) DeleteCollection(options *v1.DeleteOptions, listO
 // Patch applies the patch and returns the patched monitorTemplate.
 func (c *FakeMonitorTemplates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.MonitorTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(monitortemplatesResource, name, data, subresources...), &v1alpha1.MonitorTemplate{})
+		Invokes(testing.NewPatchSubresourceAction(monitortemplatesResource, c.ns, name, data, subresources...), &v1alpha1.MonitorTemplate{})
+
 	if obj == nil {
 		return nil, err
 	}

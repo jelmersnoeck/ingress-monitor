@@ -14,7 +14,7 @@ metadata:
 spec:
   group: ingressmonitor.sphc.io
   version: v1alpha1
-  scope: Cluster
+  scope: Namespaced
   names:
     plural: providers
     kind: Provider
@@ -30,7 +30,7 @@ metadata:
 spec:
   group: ingressmonitor.sphc.io
   version: v1alpha1
-  scope: Cluster
+  scope: Namespaced
   names:
     plural: monitortemplates
     kind: MonitorTemplate

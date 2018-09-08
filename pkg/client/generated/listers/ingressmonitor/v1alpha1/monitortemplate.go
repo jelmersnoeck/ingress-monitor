@@ -35,8 +35,8 @@ import (
 type MonitorTemplateLister interface {
 	// List lists all MonitorTemplates in the indexer.
 	List(selector labels.Selector) (ret []*v1alpha1.MonitorTemplate, err error)
-	// Get retrieves the MonitorTemplate from the index for a given name.
-	Get(name string) (*v1alpha1.MonitorTemplate, error)
+	// MonitorTemplates returns an object that can list and get MonitorTemplates.
+	MonitorTemplates(namespace string) MonitorTemplateNamespaceLister
 	MonitorTemplateListerExpansion
 }
 
@@ -58,9 +58,38 @@ func (s *monitorTemplateLister) List(selector labels.Selector) (ret []*v1alpha1.
 	return ret, err
 }
 
-// Get retrieves the MonitorTemplate from the index for a given name.
-func (s *monitorTemplateLister) Get(name string) (*v1alpha1.MonitorTemplate, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
+// MonitorTemplates returns an object that can list and get MonitorTemplates.
+func (s *monitorTemplateLister) MonitorTemplates(namespace string) MonitorTemplateNamespaceLister {
+	return monitorTemplateNamespaceLister{indexer: s.indexer, namespace: namespace}
+}
+
+// MonitorTemplateNamespaceLister helps list and get MonitorTemplates.
+type MonitorTemplateNamespaceLister interface {
+	// List lists all MonitorTemplates in the indexer for a given namespace.
+	List(selector labels.Selector) (ret []*v1alpha1.MonitorTemplate, err error)
+	// Get retrieves the MonitorTemplate from the indexer for a given namespace and name.
+	Get(name string) (*v1alpha1.MonitorTemplate, error)
+	MonitorTemplateNamespaceListerExpansion
+}
+
+// monitorTemplateNamespaceLister implements the MonitorTemplateNamespaceLister
+// interface.
+type monitorTemplateNamespaceLister struct {
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all MonitorTemplates in the indexer for a given namespace.
+func (s monitorTemplateNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.MonitorTemplate, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.MonitorTemplate))
+	})
+	return ret, err
+}
+
+// Get retrieves the MonitorTemplate from the indexer for a given namespace and name.
+func (s monitorTemplateNamespaceLister) Get(name string) (*v1alpha1.MonitorTemplate, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}

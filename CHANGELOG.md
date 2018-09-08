@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 
 - Set up lower resource requests/limits for the Deployment.
+- MonitorTemplate is now namespace scoped instead of cluster scoped.
 
 ## v0.1.1 - 2018-09-02
 

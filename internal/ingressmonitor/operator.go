@@ -311,6 +311,7 @@ func (o *Operator) garbageCollectMonitors(obj *v1alpha1.Monitor) error {
 		// reconciliation to take care of actually removing the monitor with the
 		// provider.
 		if !isActive {
+			log.Printf("Deleting IngressMonitor %s:%s with GC", obj.Namespace, im.Name)
 			if err := o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).
 				Delete(im.Name, &metav1.DeleteOptions{}); err != nil {
 				return err
@@ -449,6 +450,8 @@ func (o *Operator) handleMonitor(key string) error {
 			if err != nil {
 				return fmt.Errorf("Could not ensure IngressMonitor: %s", err)
 			}
+
+			log.Printf("Successfully synced IngressMonitor %s:%s", im.Namespace, im.Name)
 		}
 	}
 

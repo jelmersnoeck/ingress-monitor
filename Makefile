@@ -1,7 +1,7 @@
 PKG=github.com/jelmersnoeck/ingress-monitor
 PKGS := $(shell go list ./... | grep -v generated)
 
-ci: bootstrap linters check-generated lint test
+ci: bootstrap linters check-generated lint cover
 
 #################################################
 # Bootstrapping for base golang package deps

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 
 - Log when something goes wrong with GarbageCollection.
+- Use a queue based system to sync items.
 
 ### Fixed
 

@@ -73,7 +73,7 @@ func TestOperator_HandleNextItem(t *testing.T) {
 				t.Errorf("Expected ID to match, got %s", id)
 			}
 
-			return errors.New("Not handled!")
+			return errors.New("not handled")
 		}
 
 		if !op.handleNextItem("test", queue, handler) {

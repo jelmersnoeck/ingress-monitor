@@ -44,6 +44,10 @@ type MonitorNamespaceListerExpansion interface{}
 // MonitorTemplateLister.
 type MonitorTemplateListerExpansion interface{}
 
+// MonitorTemplateNamespaceListerExpansion allows custom methods to be added to
+// MonitorTemplateNamespaceLister.
+type MonitorTemplateNamespaceListerExpansion interface{}
+
 // ProviderListerExpansion allows custom methods to be added to
 // ProviderLister.
 type ProviderListerExpansion interface{}

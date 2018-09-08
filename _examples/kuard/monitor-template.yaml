@@ -2,6 +2,7 @@ apiVersion: ingressmonitor.sphc.io/v1alpha1
 kind: MonitorTemplate
 metadata:
   name: go-apps
+  namespace: websites
 spec:
   type: HTTP
   checkRate: 300s

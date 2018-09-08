@@ -212,6 +212,7 @@ func (o *Operator) OnDelete(obj interface{}) {
 		}
 
 		for _, im := range imList.Items {
+			log.Printf("Deleting IngressMonitor `%s:%s` associated with deleted Monitor `%s:%s`", im.Namespace, im.Name, obj.Namespace, obj.Name)
 			if err := o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).
 				Delete(im.Name, &metav1.DeleteOptions{}); err != nil {
 				log.Printf("Could not delete IngressMonitor %s for Monitors %s:%s: %s", im.Name, obj.Namespace, obj.Name, err)

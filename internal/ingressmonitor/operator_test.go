@@ -554,6 +554,54 @@ func TestOperator_OnDelete_IngressMonitor(t *testing.T) {
 	})
 }
 
+func TestOperator_OnDelete_Monitor(t *testing.T) {
+	im := &v1alpha1.IngressMonitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-im",
+			Namespace: "testing",
+			Labels: map[string]string{
+				monitorLabel: "delete-test-monitor",
+			},
+		},
+		Spec: v1alpha1.IngressMonitorSpec{
+			Provider: v1alpha1.NamespacedProvider{
+				Namespace: "testing",
+				ProviderSpec: v1alpha1.ProviderSpec{
+					Type: "simple",
+				},
+			},
+		},
+	}
+
+	mon := &v1alpha1.Monitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "delete-test-monitor",
+			Namespace: "testing",
+		},
+		Spec: v1alpha1.MonitorSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"team": "gophers",
+				},
+			},
+		},
+	}
+
+	crdClient := imfake.NewSimpleClientset(im, mon)
+	op, _ := NewOperator(nil, crdClient, v1.NamespaceAll, time.Minute, nil)
+
+	op.OnDelete(mon)
+
+	imList, err := crdClient.Ingressmonitor().IngressMonitors(mon.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Expected no error fetching IngressMonitors, got: %s", err)
+	}
+
+	if len(imList.Items) != 0 {
+		t.Errorf("Expected no IngressMonitors, got %d", len(imList.Items))
+	}
+}
+
 func TestOperator_HandleMonitor(t *testing.T) {
 	ing1 := &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{

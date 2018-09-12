@@ -20,6 +20,38 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
+func TestOperator_RunShutdown(t *testing.T) {
+	t.Run("with cache sync error", func(t *testing.T) {
+		op := newOperator(t).op
+
+		stopCh := make(chan struct{})
+
+		go func() {
+			// by closing the channel prematurely, we make sure the cache syncs
+			// fail
+			close(stopCh)
+		}()
+
+		errEquals(t, errCouldNotSyncCache, op.Run(stopCh), "shutting down the operator")
+	})
+
+	t.Run("after the caches have been synced", func(t *testing.T) {
+		op := newOperator(t).op
+
+		stopCh := make(chan struct{})
+
+		go func() {
+			for _, inf := range op.informers {
+				cache.WaitForCacheSync(stopCh, inf.informer.HasSynced)
+			}
+
+			close(stopCh)
+		}()
+
+		errEquals(t, nil, op.Run(stopCh), "shutting down the operator")
+	})
+}
+
 func TestOperator_DeleteIngressMonitor(t *testing.T) {
 	t.Run("delete the monitor with the provider", func(t *testing.T) {
 		im := newIngressMonitor()

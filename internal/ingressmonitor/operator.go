@@ -3,6 +3,7 @@ package ingressmonitor
 import (
 	"bytes"
 	"encoding/base32"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
@@ -39,7 +40,10 @@ const (
 	ingressHostLabel = "ingressmonitor.sphc.io/ingress-path"
 )
 
-var encoder = base32.HexEncoding.WithPadding(base32.NoPadding)
+var (
+	errCouldNotSyncCache = errors.New("could not sync caches")
+	encoder              = base32.HexEncoding.WithPadding(base32.NoPadding)
+)
 
 // Operator is the operator that handles configuring the Monitors.
 type Operator struct {
@@ -196,7 +200,7 @@ func (o *Operator) waitForCaches(stopCh <-chan struct{}) error {
 	}
 
 	if syncFailed {
-		return fmt.Errorf("could not sync cache")
+		return errCouldNotSyncCache
 	}
 
 	return nil

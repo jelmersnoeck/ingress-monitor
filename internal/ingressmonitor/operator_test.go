@@ -20,6 +20,62 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
+func TestOperator_DeleteIngressMonitor(t *testing.T) {
+	t.Run("delete the monitor with the provider", func(t *testing.T) {
+		im := newIngressMonitor()
+		im.Status.ID = "12345"
+		op := newOperator(t,
+			withIngressMonitors(im),
+			withIngresses(newIngress()),
+			withProviders(newProvider()),
+			withTemplates(newTemplate()),
+		)
+
+		prov := new(fake.SimpleProvider)
+		op.op.providerFactory.Register("simple", fake.FactoryFunc(prov))
+
+		prov.DeleteFunc = func(id string) error {
+			strEquals(t, "12345", id, "deleting the IngressMonitor")
+			return nil
+		}
+
+		op.op.OnDelete(im)
+
+		if prov.DeleteCount != 1 {
+			t.Errorf("Expected the delete action to be called")
+		}
+	})
+}
+
+func TestOperator_DeleteMonitor(t *testing.T) {
+	t.Run("delete all associated IngressMonitors", func(t *testing.T) {
+		op := newOperator(t,
+			withIngresses(newIngress()),
+			withProviders(newProvider()),
+			withTemplates(newTemplate()),
+		)
+
+		mon := newMonitor()
+		errEquals(t, nil, op.handleMonitor(t, mon), "creating a new monitor")
+
+		imList, err := op.op.imClient.IngressMonitors(mon.Namespace).List(metav1.ListOptions{})
+		errEquals(t, nil, err, "listing the IngressMonitors")
+
+		if len(imList.Items) != 1 {
+			t.Errorf("Expected 1 IngressMonitor to be available")
+		}
+
+		op.op.OnDelete(mon)
+
+		imList, err = op.op.imClient.IngressMonitors(mon.Namespace).List(metav1.ListOptions{})
+		errEquals(t, nil, err, "listing the IngressMonitors")
+
+		if len(imList.Items) != 0 {
+			t.Errorf("Expected 0 IngressMonitor to be available")
+		}
+	})
+}
+
 func TestOperator_SyncIngressMonitor(t *testing.T) {
 	t.Run("without configured provider", func(t *testing.T) {
 		op := newOperator(t)
@@ -257,10 +313,11 @@ type operatorConfig struct {
 	ingresses   []runtime.Object
 	kubeObjects []runtime.Object
 
-	providers  []runtime.Object
-	templates  []runtime.Object
-	monitors   []runtime.Object
-	crdObjects []runtime.Object
+	providers       []runtime.Object
+	templates       []runtime.Object
+	monitors        []runtime.Object
+	ingressmonitors []runtime.Object
+	crdObjects      []runtime.Object
 }
 
 type optionFunc func(*operatorConfig)
@@ -289,6 +346,13 @@ func withTemplates(obj ...runtime.Object) optionFunc {
 func withMonitors(obj ...runtime.Object) optionFunc {
 	return func(op *operatorConfig) {
 		op.monitors = append(op.monitors, obj...)
+		op.crdObjects = append(op.crdObjects, obj...)
+	}
+}
+
+func withIngressMonitors(obj ...runtime.Object) optionFunc {
+	return func(op *operatorConfig) {
+		op.ingressmonitors = append(op.ingressmonitors, obj...)
 		op.crdObjects = append(op.crdObjects, obj...)
 	}
 }
@@ -326,6 +390,10 @@ func newOperator(t *testing.T, opts ...optionFunc) *operatorWrapper {
 
 	for _, tpl := range cfg.templates {
 		op.mtInformer.GetIndexer().Add(tpl)
+	}
+
+	for _, im := range cfg.ingressmonitors {
+		op.imInformer.GetIndexer().Add(im)
 	}
 
 	return &operatorWrapper{op, k8sClient, crdClient}

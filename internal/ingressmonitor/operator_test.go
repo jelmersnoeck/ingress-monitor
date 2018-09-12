@@ -1,12 +1,14 @@
 package ingressmonitor
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider"
+	"github.com/jelmersnoeck/ingress-monitor/internal/provider/fake"
 	imfake "github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned/fake"
 
 	"k8s.io/api/core/v1"
@@ -27,8 +29,89 @@ func TestOperator_SyncIngressMonitor(t *testing.T) {
 		errEquals(t, expError, op.handleIngressMonitor(t, im))
 	})
 
+	t.Run("with enqueued item already deleted", func(t *testing.T) {
+		op := newOperator(t)
+
+		im := newIngressMonitor()
+		// call the operator handleIngressMonitor function directly, bypassing
+		// adding data to the cache
+		errEquals(t, nil, op.op.handleIngressMonitor(getKey(t, im)))
+	})
+
 	t.Run("with provider configured", func(t *testing.T) {
+		var op *operatorWrapper
+		var prov *fake.SimpleProvider
+
+		setup := func() {
+			op = newOperator(t)
+			prov = new(fake.SimpleProvider)
+			op.op.providerFactory.Register("simple", fake.FactoryFunc(prov))
+		}
+
+		t.Run("with a new ingress monitor", func(t *testing.T) {
+			t.Run("without an error", func(t *testing.T) {
+				setup()
+
+				prov.CreateFunc = func(tpl v1alpha1.MonitorTemplateSpec) (string, error) {
+					return "12345", nil
+				}
+
+				im := newIngressMonitor()
+				errEquals(t, nil, op.handleIngressMonitor(t, im), "adding an ingress monitor")
+
+				im, err := op.op.imClient.IngressMonitors(im.Namespace).Get(im.Name, metav1.GetOptions{})
+				errEquals(t, nil, err, "getting updated IngressMonitor")
+
+				strEquals(t, "12345", im.Status.ID, "status should be the same")
+			})
+
+			t.Run("without an error", func(t *testing.T) {
+				setup()
+
+				expErr := errors.New("can't create monitor")
+				prov.CreateFunc = func(tpl v1alpha1.MonitorTemplateSpec) (string, error) {
+					return "12345", expErr
+				}
+
+				im := newIngressMonitor()
+				errEquals(t, expErr, op.handleIngressMonitor(t, im), "adding an ingress monitor")
+			})
+		})
+
 		t.Run("resyncing an existing ingress monitor", func(t *testing.T) {
+			t.Run("without an error", func(t *testing.T) {
+				setup()
+
+				prov.UpdateFunc = func(id string, tpl v1alpha1.MonitorTemplateSpec) (string, error) {
+					strEquals(t, "12345", id, "id to update")
+
+					return "123456", nil
+				}
+
+				im := newIngressMonitor()
+				im.Status.ID = "12345"
+				errEquals(t, nil, op.handleIngressMonitor(t, im), "updating an ingress monitor")
+
+				im, err := op.op.imClient.IngressMonitors(im.Namespace).Get(im.Name, metav1.GetOptions{})
+				errEquals(t, nil, err, "getting updated IngressMonitor")
+
+				strEquals(t, "123456", im.Status.ID, "status should be the same")
+			})
+
+			t.Run("without an error", func(t *testing.T) {
+				setup()
+
+				expErr := errors.New("can't create monitor")
+				prov.UpdateFunc = func(id string, tpl v1alpha1.MonitorTemplateSpec) (string, error) {
+					strEquals(t, "12345", id, "id to update")
+
+					return id, expErr
+				}
+
+				im := newIngressMonitor()
+				im.Status.ID = "12345"
+				errEquals(t, expErr, op.handleIngressMonitor(t, im), "updating an ingress monitor")
+			})
 		})
 	})
 }
@@ -250,11 +333,13 @@ func newOperator(t *testing.T, opts ...optionFunc) *operatorWrapper {
 
 func (o *operatorWrapper) handleIngressMonitor(t *testing.T, mon *v1alpha1.IngressMonitor) error {
 	o.op.imInformer.GetIndexer().Add(mon)
+	o.op.imClient.IngressMonitors(mon.Namespace).Create(mon)
 	return o.op.handleIngressMonitor(getKey(t, mon))
 }
 
 func (o *operatorWrapper) handleMonitor(t *testing.T, mon *v1alpha1.Monitor) error {
 	o.op.mInformer.GetIndexer().Add(mon)
+	o.op.imClient.Monitors(mon.Namespace).Create(mon)
 	return o.op.handleMonitor(getKey(t, mon))
 }
 
@@ -273,9 +358,14 @@ func getKey(t *testing.T, obj interface{}) string {
 	return key
 }
 
-func strEquals(t *testing.T, exp, act string) {
+func strEquals(t *testing.T, exp, act string, str ...string) {
+	prefix := ""
+	for _, s := range str {
+		prefix = fmt.Sprintf("%s%s ", prefix, s)
+	}
+
 	if exp != act {
-		t.Errorf("Expected value to be '%s', got '%s'", exp, act)
+		t.Errorf("%sxpected value to be '%s', got '%s'", prefix, exp, act)
 	}
 }
 

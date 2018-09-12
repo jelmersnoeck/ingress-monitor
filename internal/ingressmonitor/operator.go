@@ -18,7 +18,7 @@ import (
 	lv1alpha1 "github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/listers/ingressmonitor/v1alpha1"
 
 	"k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -546,7 +546,7 @@ func (o *Operator) handleMonitor(key string) error {
 
 			gIM, err := o.imClient.IngressMonitors(im.Namespace).
 				Get(im.Name, metav1.GetOptions{})
-			if errors.IsNotFound(err) {
+			if kerrors.IsNotFound(err) {
 				_, err = o.imClient.IngressMonitors(im.Namespace).Create(im)
 			} else if err == nil {
 				im.ObjectMeta = gIM.ObjectMeta

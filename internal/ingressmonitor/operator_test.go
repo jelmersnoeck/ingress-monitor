@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
+	"github.com/jelmersnoeck/ingress-monitor/internal/metrics"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider/fake"
 	imfake "github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned/fake"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
@@ -395,10 +397,16 @@ func newOperator(t *testing.T, opts ...optionFunc) *operatorWrapper {
 		opt(cfg)
 	}
 
+	registry := prometheus.NewRegistry()
+	mtrc := metrics.New(registry)
+
 	k8sClient := k8sfake.NewSimpleClientset(cfg.kubeObjects...)
 	crdClient := imfake.NewSimpleClientset(cfg.crdObjects...)
 	fact := provider.NewFactory(nil)
-	op, err := NewOperator(k8sClient, crdClient, v1.NamespaceAll, noResyncPeriodFunc(), fact)
+	op, err := NewOperator(
+		k8sClient, crdClient, v1.NamespaceAll,
+		noResyncPeriodFunc(), fact, mtrc,
+	)
 	if err != nil {
 		t.Fatalf("Error creating the operator: %s", err)
 	}

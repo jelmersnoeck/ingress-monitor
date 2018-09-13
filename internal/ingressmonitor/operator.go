@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
+	"github.com/jelmersnoeck/ingress-monitor/internal/metrics"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider"
 	"github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned"
 	crdscheme "github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned/scheme"
@@ -49,6 +50,7 @@ var (
 type Operator struct {
 	kubeClient kubernetes.Interface
 	imClient   tv1alpha1.IngressmonitorV1alpha1Interface
+	metrics    *metrics.Metrics
 
 	providerFactory provider.FactoryInterface
 
@@ -78,7 +80,8 @@ type namedInformer struct {
 func NewOperator(
 	kc kubernetes.Interface, imc versioned.Interface,
 	namespace string, resync time.Duration,
-	providerFactory provider.FactoryInterface) (*Operator, error) {
+	providerFactory provider.FactoryInterface,
+	mtrcs *metrics.Metrics) (*Operator, error) {
 
 	// Register the scheme with the client so we can use it through the API
 	crdscheme.AddToScheme(scheme.Scheme)
@@ -92,6 +95,7 @@ func NewOperator(
 		providerFactory:     providerFactory,
 		monitorQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Monitors"),
 		ingressMonitorQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "IngressMonitors"),
+		metrics:             mtrcs,
 
 		imInformer:   imInformer.IngressMonitors().Informer(),
 		mInformer:    imInformer.Monitors().Informer(),
@@ -280,6 +284,8 @@ func (o *Operator) enqueueMonitor(m *v1alpha1.Monitor) {
 func (o *Operator) OnAdd(obj interface{}) {
 	switch obj := obj.(type) {
 	case *v1alpha1.IngressMonitor:
+		o.metrics.AddIngressMonitor(ingressMonitorMetric(obj, nil))
+
 		o.enqueueIngressMonitor(obj)
 	case *v1alpha1.Monitor:
 		o.enqueueMonitor(obj)
@@ -302,6 +308,8 @@ func (o *Operator) OnUpdate(old, new interface{}) {
 func (o *Operator) OnDelete(obj interface{}) {
 	switch obj := obj.(type) {
 	case *v1alpha1.IngressMonitor:
+		o.metrics.DeleteIngressMonitor(ingressMonitorMetric(obj, nil))
+
 		cl, err := o.providerFactory.From(obj.Spec.Provider)
 		if err != nil {
 			log.Printf("Could not get provider for IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
@@ -332,7 +340,7 @@ func (o *Operator) OnDelete(obj interface{}) {
 
 // handleIngressMonitor handles IngressMonitors in a way that it knows how to
 // deal with creating and updating resources.
-func (o *Operator) handleIngressMonitor(key string) error {
+func (o *Operator) handleIngressMonitor(key string) (err error) {
 	item, exists, err := o.imInformer.GetIndexer().GetByKey(key)
 	if err != nil {
 		return err
@@ -344,6 +352,11 @@ func (o *Operator) handleIngressMonitor(key string) error {
 	}
 
 	obj := item.(*v1alpha1.IngressMonitor)
+
+	// XXX handle indexer errors
+	defer func() {
+		o.metrics.SyncIngressMonitor(ingressMonitorMetric(obj, err))
+	}()
 
 	cl, err := o.providerFactory.From(obj.Spec.Provider)
 	if err != nil {
@@ -606,4 +619,16 @@ func templatedName(ing *v1beta1.Ingress, sp v1alpha1.MonitorTemplateSpec) (strin
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+func ingressMonitorMetric(obj *v1alpha1.IngressMonitor, err error) metrics.IngressMonitorMetric {
+	var success bool
+	if err == nil {
+		success = true
+	}
+	return metrics.IngressMonitorMetric{
+		Namespace: obj.Namespace,
+		Name:      obj.Name,
+		Success:   success,
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/jelmersnoeck/ingress-monitor/internal/httpsvc"
 	"github.com/jelmersnoeck/ingress-monitor/internal/ingressmonitor"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider/logger"
@@ -22,6 +23,9 @@ var operatorFlags struct {
 	MasterURL    string
 	KubeConfig   string
 	ResyncPeriod string
+
+	HTTPAddr string
+	HTTPPort int
 }
 
 // operatorCmd represents the operator command
@@ -54,9 +58,19 @@ func runOperator(cmd *cobra.Command, args []string) {
 		log.Fatalf("Error building IngressMonitor clientset: %s", err)
 	}
 
+	// register the available providers
 	fact := provider.NewFactory(kubeClient)
 	statuscake.Register(fact)
 	logger.Register(fact)
+
+	// register the health server
+	healthSrv := &httpsvc.Health{
+		Server: httpsvc.Server{
+			Addr: operatorFlags.HTTPAddr,
+			Port: operatorFlags.HTTPPort,
+		},
+	}
+	go healthSrv.Start(stopCh)
 
 	op, err := ingressmonitor.NewOperator(
 		kubeClient, imClient, operatorFlags.Namespace,
@@ -78,4 +92,7 @@ func init() {
 	operatorCmd.PersistentFlags().StringVar(&operatorFlags.MasterURL, "master-url", "", "The URL of the master API.")
 	operatorCmd.PersistentFlags().StringVar(&operatorFlags.KubeConfig, "kubeconfig", "", "Kubeconfig which should be used to talk to the API.")
 	operatorCmd.PersistentFlags().StringVar(&operatorFlags.ResyncPeriod, "resync-period", "30s", "Resyncing period to ensure all monitors are up to date.")
+
+	operatorCmd.PersistentFlags().StringVar(&operatorFlags.HTTPAddr, "http-addr", "0.0.0.0", "address the health server will bind to")
+	operatorCmd.PersistentFlags().IntVar(&operatorFlags.HTTPPort, "http-port", 9090, "port on which the health server is available")
 }

@@ -145,6 +145,26 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
           - operator
+          livenessProbe:
+            httpGet:
+              path: /_healthz
+              port: 9090
+              scheme: HTTP
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 50
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /_healthz
+              port: 9090
+              scheme: HTTP
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
           resources:
             requests:
               cpu: 1m

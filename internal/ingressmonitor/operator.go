@@ -3,6 +3,7 @@ package ingressmonitor
 import (
 	"bytes"
 	"encoding/base32"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
@@ -13,15 +14,19 @@ import (
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider"
 	"github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned"
 	crdscheme "github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned/scheme"
+	tv1alpha1 "github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned/typed/ingressmonitor/v1alpha1"
 	"github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/informers/externalversions"
+	lv1alpha1 "github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/listers/ingressmonitor/v1alpha1"
 
 	"k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	ev1beta1 "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -35,18 +40,37 @@ const (
 	ingressHostLabel = "ingressmonitor.sphc.io/ingress-path"
 )
 
-var encoder = base32.HexEncoding.WithPadding(base32.NoPadding)
+var (
+	errCouldNotSyncCache = errors.New("could not sync caches")
+	encoder              = base32.HexEncoding.WithPadding(base32.NoPadding)
+)
 
 // Operator is the operator that handles configuring the Monitors.
 type Operator struct {
 	kubeClient kubernetes.Interface
-	imClient   versioned.Interface
+	imClient   tv1alpha1.IngressmonitorV1alpha1Interface
 
-	imInformer      externalversions.SharedInformerFactory
 	providerFactory provider.FactoryInterface
+
+	imInformer   cache.SharedIndexInformer
+	mInformer    cache.SharedIndexInformer
+	ingInformer  cache.SharedIndexInformer
+	provInformer cache.SharedIndexInformer
+	mtInformer   cache.SharedIndexInformer
+
+	informers []namedInformer
+
+	ingLister  ev1beta1.IngressLister
+	provLister lv1alpha1.ProviderLister
+	mtLister   lv1alpha1.MonitorTemplateLister
 
 	monitorQueue        workqueue.RateLimitingInterface
 	ingressMonitorQueue workqueue.RateLimitingInterface
+}
+
+type namedInformer struct {
+	name     string
+	informer cache.SharedIndexInformer
 }
 
 // NewOperator sets up a new IngressMonitor Operator which will watch for
@@ -59,18 +83,40 @@ func NewOperator(
 	// Register the scheme with the client so we can use it through the API
 	crdscheme.AddToScheme(scheme.Scheme)
 
+	imInformer := externalversions.NewSharedInformerFactory(imc, resync).Ingressmonitor().V1alpha1()
+	k8sInformer := informers.NewSharedInformerFactory(kc, resync)
+
 	op := &Operator{
 		kubeClient:          kc,
-		imClient:            imc,
-		imInformer:          externalversions.NewSharedInformerFactory(imc, resync),
+		imClient:            imc.Ingressmonitor(),
 		providerFactory:     providerFactory,
 		monitorQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Monitors"),
 		ingressMonitorQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "IngressMonitors"),
+
+		imInformer:   imInformer.IngressMonitors().Informer(),
+		mInformer:    imInformer.Monitors().Informer(),
+		provInformer: imInformer.Providers().Informer(),
+		mtInformer:   imInformer.MonitorTemplates().Informer(),
+
+		ingInformer: k8sInformer.Extensions().V1beta1().Ingresses().Informer(),
 	}
 
 	// Add EventHandlers for all objects we want to track
-	op.imInformer.Ingressmonitor().V1alpha1().Monitors().Informer().AddEventHandler(op)
-	op.imInformer.Ingressmonitor().V1alpha1().IngressMonitors().Informer().AddEventHandler(op)
+	op.imInformer.AddEventHandler(op)
+	op.mInformer.AddEventHandler(op)
+
+	// set up listers
+	op.ingLister = ev1beta1.NewIngressLister(op.ingInformer.GetIndexer())
+	op.provLister = lv1alpha1.NewProviderLister(op.provInformer.GetIndexer())
+	op.mtLister = lv1alpha1.NewMonitorTemplateLister(op.mtInformer.GetIndexer())
+
+	op.informers = []namedInformer{
+		{"IngressMonitor", op.imInformer},
+		{"Monitor", op.mInformer},
+		{"Ingress", op.ingInformer},
+		{"Provider", op.provInformer},
+		{"MonitorTemplate", op.mtInformer},
+	}
 
 	return op, nil
 }
@@ -81,9 +127,14 @@ func (o *Operator) Run(stopCh <-chan struct{}) error {
 	defer o.ingressMonitorQueue.ShutDown()
 
 	log.Printf("Starting IngressMonitor Operator")
+	if err := o.connectToCluster(stopCh); err != nil {
+		return err
+	}
 
 	log.Printf("Starting the informers")
-	o.imInformer.Start(stopCh)
+	if err := o.startInformers(stopCh); err != nil {
+		return err
+	}
 
 	log.Printf("Starting the workers")
 	for i := 0; i < 4; i++ {
@@ -93,6 +144,64 @@ func (o *Operator) Run(stopCh <-chan struct{}) error {
 
 	<-stopCh
 	log.Printf("Stopping IngressMonitor Operator")
+
+	return nil
+}
+
+func (o *Operator) connectToCluster(stopCh <-chan struct{}) error {
+	errCh := make(chan error)
+	go func() {
+		v, err := o.kubeClient.Discovery().ServerVersion()
+		if err != nil {
+			errCh <- fmt.Errorf("Could not communicate with the server: %s", err)
+			return
+		}
+
+		log.Printf("Connected to the cluster (version %s)", v)
+		errCh <- nil
+	}()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return err
+		}
+	case <-stopCh:
+		return nil
+	}
+
+	return nil
+}
+
+func (o *Operator) startInformers(stopCh <-chan struct{}) error {
+	for _, inf := range o.informers {
+		log.Printf("Starting informer %s", inf.name)
+		go inf.informer.Run(stopCh)
+	}
+
+	if err := o.waitForCaches(stopCh); err != nil {
+		return err
+	}
+
+	log.Printf("Synced all caches")
+	return nil
+}
+
+func (o *Operator) waitForCaches(stopCh <-chan struct{}) error {
+	var syncFailed bool
+	for _, inf := range o.informers {
+		log.Printf("Waiting for cache sync for %s", inf.name)
+		if !cache.WaitForCacheSync(stopCh, inf.informer.HasSynced) {
+			log.Printf("Could not sync cache for %s", inf.name)
+			syncFailed = true
+		} else {
+			log.Printf("Synced cache for %s", inf.name)
+		}
+	}
+
+	if syncFailed {
+		return errCouldNotSyncCache
+	}
 
 	return nil
 }
@@ -204,7 +313,7 @@ func (o *Operator) OnDelete(obj interface{}) {
 			return
 		}
 	case *v1alpha1.Monitor:
-		imList, err := o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).
+		imList, err := o.imClient.IngressMonitors(obj.Namespace).
 			List(listOptions(map[string]string{monitorLabel: obj.Name}))
 		if err != nil {
 			log.Printf("Could not list IngressMonitors for Monitors %s:%s: %s", obj.Namespace, obj.Name, err)
@@ -213,7 +322,7 @@ func (o *Operator) OnDelete(obj interface{}) {
 
 		for _, im := range imList.Items {
 			log.Printf("Deleting IngressMonitor `%s:%s` associated with deleted Monitor `%s:%s`", im.Namespace, im.Name, obj.Namespace, obj.Name)
-			if err := o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).
+			if err := o.imClient.IngressMonitors(obj.Namespace).
 				Delete(im.Name, &metav1.DeleteOptions{}); err != nil {
 				log.Printf("Could not delete IngressMonitor %s for Monitors %s:%s: %s", im.Name, obj.Namespace, obj.Name, err)
 			}
@@ -224,17 +333,17 @@ func (o *Operator) OnDelete(obj interface{}) {
 // handleIngressMonitor handles IngressMonitors in a way that it knows how to
 // deal with creating and updating resources.
 func (o *Operator) handleIngressMonitor(key string) error {
-	// Convert the namespace/name string into a distinct namespace and name
-	namespace, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		return fmt.Errorf("Invalid Resource Key for IngressMonitor: %s", key)
-	}
-
-	obj, err := o.imClient.Ingressmonitor().IngressMonitors(namespace).
-		Get(name, metav1.GetOptions{})
+	item, exists, err := o.imInformer.GetIndexer().GetByKey(key)
 	if err != nil {
 		return err
 	}
+
+	// it's been deleted before we start handling it
+	if !exists {
+		return nil
+	}
+
+	obj := item.(*v1alpha1.IngressMonitor)
 
 	cl, err := o.providerFactory.From(obj.Spec.Provider)
 	if err != nil {
@@ -258,7 +367,7 @@ func (o *Operator) handleIngressMonitor(key string) error {
 	// will be present, and thus create a new one.
 	if obj.Status.ID != id {
 		obj.Status.ID = id
-		_, err = o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).Update(obj)
+		_, err = o.imClient.IngressMonitors(obj.Namespace).Update(obj)
 	}
 
 	return err
@@ -272,10 +381,14 @@ func (o *Operator) handleIngressMonitor(key string) error {
 // If one of the monitors isn't linked to the Ingress, it gets marked for
 // deletion.
 func (o *Operator) garbageCollectMonitors(obj *v1alpha1.Monitor) error {
-	ingressList, err := o.kubeClient.Extensions().Ingresses(obj.Namespace).
-		List(listOptions(obj.Spec.Selector.MatchLabels))
+	ingLabels, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector)
 	if err != nil {
-		return err
+		return fmt.Errorf("Could not create label selector for %s:%s: %s", obj.Namespace, obj.Name, err)
+	}
+
+	ingressList, err := o.ingLister.Ingresses(obj.Namespace).List(ingLabels)
+	if err != nil {
+		return fmt.Errorf("Could not list Ingresses: %s", err)
 	}
 
 	// We'll calculate all the IngressMonitors that shouldn't be tracked
@@ -283,12 +396,9 @@ func (o *Operator) garbageCollectMonitors(obj *v1alpha1.Monitor) error {
 	// IngressMonitors where the owner is this Monitor, go over them all and
 	// see if there are any where the Ingress Owner isn't in the new Ingress
 	// List.
-	imList, err := o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).
-		List(listOptions(map[string]string{monitorLabel: obj.Name}))
-	if err != nil {
-		return err
-	}
-	for _, im := range imList.Items {
+	imLabels := labels.SelectorFromSet(map[string]string{monitorLabel: obj.Name})
+	cache.ListAllByNamespace(o.imInformer.GetIndexer(), obj.Namespace, imLabels, func(imObj interface{}) {
+		im := imObj.(*v1alpha1.IngressMonitor)
 		var isActive bool
 
 		// Go through all newly selected Ingresses and see if this
@@ -296,8 +406,8 @@ func (o *Operator) garbageCollectMonitors(obj *v1alpha1.Monitor) error {
 		// validating if it's controlled by the Ingress, and if so we check if
 		// it matches any of the rules. Ingresses might change which means a
 		// specific rule can be dropped. We need to GC that.
-		for _, ing := range ingressList.Items {
-			if metav1.IsControlledBy(&im, &ing) {
+		for _, ing := range ingressList {
+			if metav1.IsControlledBy(im, ing) {
 				for _, rule := range ing.Spec.Rules {
 					if rule.Host == im.Labels[ingressHostLabel] {
 						isActive = true
@@ -312,58 +422,63 @@ func (o *Operator) garbageCollectMonitors(obj *v1alpha1.Monitor) error {
 		// reconciliation to take care of actually removing the monitor with the
 		// provider.
 		if !isActive {
-			log.Printf("Deleting IngressMonitor %s:%s with GC", obj.Namespace, im.Name)
-			if err := o.imClient.Ingressmonitor().IngressMonitors(obj.Namespace).
+			log.Printf("Deleting IngressMonitor %s:%s with GC", im.Namespace, im.Name)
+			if err := o.imClient.IngressMonitors(im.Namespace).
 				Delete(im.Name, &metav1.DeleteOptions{}); err != nil {
-				return err
+
+				log.Printf("Could not delete IngressMonitor %s:%s: %s", im.Namespace, im.Name, err)
 			}
 		}
-	}
+	})
 
 	return nil
 }
 
 func (o *Operator) handleMonitor(key string) error {
-	// Convert the namespace/name string into a distinct namespace and name
-	namespace, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		return fmt.Errorf("Invalid Resource Key for Monitor: %s", key)
-	}
-
-	obj, err := o.imClient.Ingressmonitor().Monitors(namespace).
-		Get(name, metav1.GetOptions{})
+	item, exists, err := o.mInformer.GetIndexer().GetByKey(key)
 	if err != nil {
 		return err
 	}
 
+	// it's been deleted before we start handling it
+	if !exists {
+		return nil
+	}
+
+	obj := item.(*v1alpha1.Monitor)
 	if err := o.garbageCollectMonitors(obj); err != nil {
 		return fmt.Errorf("Error doing garbage collection for %s:%s: %s", obj.Namespace, obj.Name, err)
 	}
 
-	ingressList, err := o.kubeClient.Extensions().Ingresses(obj.Namespace).
-		List(listOptions(obj.Spec.Selector.MatchLabels))
+	ingLabels, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector)
+	if err != nil {
+		return fmt.Errorf("Could not create label selector for %s:%s: %s", obj.Namespace, obj.Name, err)
+	}
+
+	ingressList, err := o.ingLister.Ingresses(obj.Namespace).List(ingLabels)
 	if err != nil {
 		return fmt.Errorf("Could not list Ingresses: %s", err)
 	}
 
-	// fetch the referenced provider
-	prov, err := o.imClient.Ingressmonitor().Providers(obj.Namespace).
-		Get(obj.Spec.Provider.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("Could not get Provider: %s", err)
+	if len(ingressList) == 0 {
+		log.Printf("No ingresses selected for %s:%s", obj.Namespace, obj.Name)
+		return nil
 	}
 
-	// fetch the referenced template
-	tmpl, err := o.imClient.Ingressmonitor().MonitorTemplates(obj.Namespace).
-		Get(obj.Spec.Template.Name, metav1.GetOptions{})
+	prov, err := o.provLister.Providers(obj.Namespace).Get(obj.Spec.Provider.Name)
 	if err != nil {
-		return fmt.Errorf("Could not get MonitorTemplate: %s", err)
+		return fmt.Errorf("Could not get Provider %s:%s: %s", obj.Namespace, obj.Spec.Provider.Name, err)
+	}
+
+	tmpl, err := o.mtLister.MonitorTemplates(obj.Namespace).Get(obj.Spec.Template.Name)
+	if err != nil {
+		return fmt.Errorf("Could not get MonitorTemplate %s: %s", obj.Spec.Template.Name, err)
 	}
 
 	// reconcile the newly selected Ingresses. We'll create new IngressMonitors
 	// for each Ingress and it's subsequent rules. If it already exists, we
 	// update it.
-	for _, ing := range ingressList.Items {
+	for _, ing := range ingressList {
 		for _, rule := range ing.Spec.Rules {
 			name := fmt.Sprintf("%s-%s", ing.Name, shortHash(rule.Host, 16))
 
@@ -412,7 +527,7 @@ func (o *Operator) handleMonitor(key string) error {
 					// have to set this up ourselves.
 					OwnerReferences: []metav1.OwnerReference{
 						*metav1.NewControllerRef(
-							&ing,
+							ing,
 							extensions.SchemeGroupVersion.WithKind("Ingress"),
 						),
 						monitorReference,
@@ -433,19 +548,17 @@ func (o *Operator) handleMonitor(key string) error {
 				},
 			}
 
-			gIM, err := o.imClient.Ingressmonitor().IngressMonitors(im.Namespace).
+			gIM, err := o.imClient.IngressMonitors(im.Namespace).
 				Get(im.Name, metav1.GetOptions{})
-			if errors.IsNotFound(err) {
-				_, err = o.imClient.Ingressmonitor().
-					IngressMonitors(im.Namespace).Create(im)
+			if kerrors.IsNotFound(err) {
+				_, err = o.imClient.IngressMonitors(im.Namespace).Create(im)
 			} else if err == nil {
 				im.ObjectMeta = gIM.ObjectMeta
 				im.TypeMeta = gIM.TypeMeta
 				im.Status = gIM.Status
 				im.Status.IngressName = ing.Name
 
-				_, err = o.imClient.Ingressmonitor().
-					IngressMonitors(im.Namespace).Update(im)
+				_, err = o.imClient.IngressMonitors(im.Namespace).Update(im)
 			}
 
 			if err != nil {
@@ -474,7 +587,7 @@ func shortHash(data string, len int) string {
 	return strings.ToLower(encoder.EncodeToString(b2b.Sum(nil)))
 }
 
-func templatedName(ing v1beta1.Ingress, sp v1alpha1.MonitorTemplateSpec) (string, error) {
+func templatedName(ing *v1beta1.Ingress, sp v1alpha1.MonitorTemplateSpec) (string, error) {
 	tpl, err := template.New("im-name").Parse(sp.Name)
 	if err != nil {
 		return "", err

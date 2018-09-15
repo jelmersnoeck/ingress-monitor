@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Log when something goes wrong with GarbageCollection.
 - Use a queue based system to sync items.
+- Added `/_healthz` endpoint and set up probes.
+- Added `/metrics` endpoint for Prometheus.
 
 ### Fixed
 
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Set up lower resource requests/limits for the Deployment.
 - MonitorTemplate is now namespace scoped instead of cluster scoped.
+- The operator now uses cache informers to reconcile state.
 
 ## v0.1.1 - 2018-09-02
 

@@ -2,15 +2,19 @@ package cmd
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/jelmersnoeck/ingress-monitor/internal/httpsvc"
 	"github.com/jelmersnoeck/ingress-monitor/internal/ingressmonitor"
+	"github.com/jelmersnoeck/ingress-monitor/internal/metrics"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider/logger"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider/statuscake"
 	"github.com/jelmersnoeck/ingress-monitor/internal/signals"
 	"github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
@@ -24,8 +28,8 @@ var operatorFlags struct {
 	KubeConfig   string
 	ResyncPeriod string
 
-	HTTPAddr string
-	HTTPPort int
+	MetricsAddr string
+	MetricsPort int
 }
 
 // operatorCmd represents the operator command
@@ -63,18 +67,25 @@ func runOperator(cmd *cobra.Command, args []string) {
 	statuscake.Register(fact)
 	logger.Register(fact)
 
-	// register the health server
-	healthSrv := &httpsvc.Health{
+	// create new prometheus registry
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(prometheus.NewProcessCollector(os.Getpid(), ""))
+	registry.MustRegister(prometheus.NewGoCollector())
+
+	// new metrics collector
+	mtrc := metrics.New(registry)
+	metricssvc := httpsvc.Metrics{
 		Server: httpsvc.Server{
-			Addr: operatorFlags.HTTPAddr,
-			Port: operatorFlags.HTTPPort,
+			Addr: operatorFlags.MetricsAddr,
+			Port: operatorFlags.MetricsPort,
 		},
+		Registry: registry,
 	}
-	go healthSrv.Start(stopCh)
+	go metricssvc.Start(stopCh)
 
 	op, err := ingressmonitor.NewOperator(
 		kubeClient, imClient, operatorFlags.Namespace,
-		resync, fact,
+		resync, fact, mtrc,
 	)
 	if err != nil {
 		log.Fatalf("Error building IngressMonitor Operator: %s", err)
@@ -93,6 +104,6 @@ func init() {
 	operatorCmd.PersistentFlags().StringVar(&operatorFlags.KubeConfig, "kubeconfig", "", "Kubeconfig which should be used to talk to the API.")
 	operatorCmd.PersistentFlags().StringVar(&operatorFlags.ResyncPeriod, "resync-period", "30s", "Resyncing period to ensure all monitors are up to date.")
 
-	operatorCmd.PersistentFlags().StringVar(&operatorFlags.HTTPAddr, "http-addr", "0.0.0.0", "address the health server will bind to")
-	operatorCmd.PersistentFlags().IntVar(&operatorFlags.HTTPPort, "http-port", 9090, "port on which the health server is available")
+	operatorCmd.PersistentFlags().StringVar(&operatorFlags.MetricsAddr, "metrics-addr", "0.0.0.0", "address the metrics server will bind to")
+	operatorCmd.PersistentFlags().IntVar(&operatorFlags.MetricsPort, "metrics-port", 9090, "port on which the metrics server is available")
 }

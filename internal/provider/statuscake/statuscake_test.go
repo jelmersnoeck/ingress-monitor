@@ -451,7 +451,7 @@ func TestClient_Update(t *testing.T) {
 		}
 
 		if fc.updateCount != 1 {
-			t.Errorf("Expected 1 udpate call, got %d", fc.updateCount)
+			t.Errorf("Expected 1 update call, got %d", fc.updateCount)
 		}
 	})
 

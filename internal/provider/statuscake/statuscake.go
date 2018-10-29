@@ -134,6 +134,12 @@ func (c *Client) Update(id string, spec v1alpha1.MonitorTemplateSpec) (string, e
 		// We want to keep doing these calls to ensure that the monitor is how
 		// it should be configured in our specs.
 		return id, nil
+	} else if err != nil && err.Error() == fmt.Sprintf("No data has been updated (is any data different?)") {
+		// XXX see if we get a proper status code back for this kind of error,
+		// it's not really an error.
+		// We want to keep doing these calls to ensure that the monitor is how
+		// it should be configured in our specs.
+		return id, nil
 	}
 
 	if err != nil {

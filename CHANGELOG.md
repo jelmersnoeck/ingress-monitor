@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## v0.2.0 - 2018-10-31
 
 ### Added
 
@@ -17,12 +17,22 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 
 - Correct RBAC rules for the ServiceAccount.
+- Fixed an issue where StatusCake is returning another error for empty data updates.
 
 ### Changed
 
 - Set up lower resource requests/limits for the Deployment.
 - MonitorTemplate is now namespace scoped instead of cluster scoped.
 - The operator now uses cache informers to reconcile state.
+
+### Upgrade Path
+
+- Stop the operator
+- Remove the MonitorTemplate and Provider CRD specifications
+- Update your own MonitorTemplate and Provider templates to be namespaced
+- Apply the new MonitorTemplate and Provider CRD specifications
+- Apply the new MonitorTemplate and Provider templates
+- Run the new operator
 
 ## v0.1.1 - 2018-09-02
 

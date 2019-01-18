@@ -38,7 +38,7 @@ required = [
   version = "0.8.0"
 
 [[constraint]]
-  branch = "report-error-status"
+  branch = "master"
   name = "github.com/DreamItGetIT/statuscake"
   source = "github.com/manifoldco/statuscake"
 

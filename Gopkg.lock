@@ -2,12 +2,12 @@
 
 
 [[projects]]
-  branch = "report-error-status"
+  branch = "master"
   digest = "1:bd2bac2300ffac00beb0627d28caf68134ba6a025e696377dcc201539bc57288"
   name = "github.com/DreamItGetIT/statuscake"
   packages = ["."]
   pruneopts = ""
-  revision = "7787f0d178032a689483e50ea60d829d8a98b27e"
+  revision = "24cd3ff224174c5f7a90d076f0dbc1ce88ff86aa"
   source = "github.com/manifoldco/statuscake"
 
 [[projects]]

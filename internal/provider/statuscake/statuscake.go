@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/DreamItGetIT/statuscake"
+	"github.com/manifoldco/statuscake"
 )
 
 // The StatusCake Client we're using expects us to set this.
@@ -193,6 +193,7 @@ func (c *Client) translateSpec(spec v1alpha1.MonitorTemplateSpec) (*statuscake.T
 		scTest.WebsiteURL = http.URL
 		scTest.FollowRedirect = http.FollowRedirects
 		scTest.FindString = spec.HTTP.ShouldContain
+		scTest.EnableSSLAlert = spec.HTTP.VerifyCertificate
 
 		if spec.HTTP.ShouldNotContain != "" {
 			scTest.FindString = spec.HTTP.ShouldNotContain

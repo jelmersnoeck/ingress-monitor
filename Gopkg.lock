@@ -3,11 +3,12 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:f4d469a10c1710cc1bf2e6c46756f77117413ec7c7509b54a8606824b4dceddc"
+  digest = "1:bd2bac2300ffac00beb0627d28caf68134ba6a025e696377dcc201539bc57288"
   name = "github.com/DreamItGetIT/statuscake"
   packages = ["."]
   pruneopts = ""
-  revision = "85edefcbdaa39278c9db647d135d1dc8bccdad96"
+  revision = "24cd3ff224174c5f7a90d076f0dbc1ce88ff86aa"
+  source = "github.com/manifoldco/statuscake"
 
 [[projects]]
   branch = "master"
@@ -215,7 +216,10 @@
 [[projects]]
   digest = "1:4142d94383572e74b42352273652c62afec5b23f325222ed09198f46009022d1"
   name = "github.com/prometheus/client_golang"
-  packages = ["prometheus"]
+  packages = [
+    "prometheus",
+    "prometheus/promhttp",
+  ]
   pruneopts = ""
   revision = "c5b7fccd204277076155f10851dad72b76a49317"
   version = "v0.8.0"
@@ -706,6 +710,8 @@
     "github.com/dchest/blake2b",
     "github.com/golang/glog",
     "github.com/prometheus/client_golang/prometheus",
+    "github.com/prometheus/client_golang/prometheus/promhttp",
+    "github.com/prometheus/client_model/go",
     "github.com/spf13/cobra",
     "github.com/spf13/viper",
     "k8s.io/api/core/v1",

@@ -139,6 +139,7 @@ func TestTranslateSpec(t *testing.T) {
 				UserAgent:      "(Test User Agent)",
 				WebsiteURL:     "http://fully-qualified-url.com",
 				FollowRedirect: true,
+				EnableSSLAlert: false,
 			},
 		},
 		{
@@ -146,11 +147,12 @@ func TestTranslateSpec(t *testing.T) {
 			v1alpha1.MonitorTemplateSpec{
 				Type: "HTTP",
 				HTTP: &v1alpha1.HTTPTemplate{
-					CustomHeader:    "Test-Header",
-					UserAgent:       "(Test User Agent)",
-					URL:             "http://fully-qualified-url.com",
-					FollowRedirects: true,
-					ShouldContain:   "this string",
+					CustomHeader:      "Test-Header",
+					UserAgent:         "(Test User Agent)",
+					URL:               "http://fully-qualified-url.com",
+					FollowRedirects:   true,
+					ShouldContain:     "this string",
+					VerifyCertificate: true,
 				},
 			},
 			nil,
@@ -162,6 +164,7 @@ func TestTranslateSpec(t *testing.T) {
 				FollowRedirect: true,
 				FindString:     "this string",
 				DoNotFind:      false,
+				EnableSSLAlert: true,
 			},
 		},
 		{
@@ -169,11 +172,12 @@ func TestTranslateSpec(t *testing.T) {
 			v1alpha1.MonitorTemplateSpec{
 				Type: "HTTP",
 				HTTP: &v1alpha1.HTTPTemplate{
-					CustomHeader:     "Test-Header",
-					UserAgent:        "(Test User Agent)",
-					URL:              "http://fully-qualified-url.com",
-					FollowRedirects:  true,
-					ShouldNotContain: "this string",
+					CustomHeader:      "Test-Header",
+					UserAgent:         "(Test User Agent)",
+					URL:               "http://fully-qualified-url.com",
+					FollowRedirects:   true,
+					ShouldNotContain:  "this string",
+					VerifyCertificate: true,
 				},
 			},
 			nil,
@@ -185,6 +189,7 @@ func TestTranslateSpec(t *testing.T) {
 				FollowRedirect: true,
 				FindString:     "this string",
 				DoNotFind:      true,
+				EnableSSLAlert: true,
 			},
 		},
 		{
@@ -192,10 +197,11 @@ func TestTranslateSpec(t *testing.T) {
 			v1alpha1.MonitorTemplateSpec{
 				Type: "HTTP",
 				HTTP: &v1alpha1.HTTPTemplate{
-					CustomHeader:    "Test-Header",
-					UserAgent:       "(Test User Agent)",
-					URL:             "http://fully-qualified-url.com",
-					FollowRedirects: true,
+					CustomHeader:      "Test-Header",
+					UserAgent:         "(Test User Agent)",
+					URL:               "http://fully-qualified-url.com",
+					FollowRedirects:   true,
+					VerifyCertificate: true,
 				},
 			},
 			[]string{"12345"},
@@ -206,6 +212,7 @@ func TestTranslateSpec(t *testing.T) {
 				WebsiteURL:     "http://fully-qualified-url.com",
 				FollowRedirect: true,
 				ContactGroup:   []string{"12345"},
+				EnableSSLAlert: true,
 			},
 		},
 	}
@@ -387,7 +394,8 @@ func TestClient_Update(t *testing.T) {
 			HTTP: &v1alpha1.HTTPTemplate{
 				CustomHeader: "Test-Header",
 				UserAgent:    "(Test User Agent)", URL: "http://fully-qualified-url.com",
-				FollowRedirects: true,
+				FollowRedirects:   true,
+				VerifyCertificate: true,
 			},
 		}
 
@@ -416,7 +424,8 @@ func TestClient_Update(t *testing.T) {
 			HTTP: &v1alpha1.HTTPTemplate{
 				CustomHeader: "Test-Header",
 				UserAgent:    "(Test User Agent)", URL: "http://fully-qualified-url.com",
-				FollowRedirects: true,
+				FollowRedirects:   true,
+				VerifyCertificate: true,
 			},
 		}
 
@@ -437,7 +446,8 @@ func TestClient_Update(t *testing.T) {
 			HTTP: &v1alpha1.HTTPTemplate{
 				CustomHeader: "Test-Header",
 				UserAgent:    "(Test User Agent)", URL: "http://fully-qualified-url.com",
-				FollowRedirects: true,
+				FollowRedirects:   true,
+				VerifyCertificate: true,
 			},
 		}
 
@@ -463,7 +473,8 @@ func TestClient_Update(t *testing.T) {
 			HTTP: &v1alpha1.HTTPTemplate{
 				CustomHeader: "Test-Header",
 				UserAgent:    "(Test User Agent)", URL: "http://fully-qualified-url.com",
-				FollowRedirects: true,
+				FollowRedirects:   true,
+				VerifyCertificate: true,
 			},
 		}
 

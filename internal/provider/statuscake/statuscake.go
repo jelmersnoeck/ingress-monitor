@@ -193,6 +193,7 @@ func (c *Client) translateSpec(spec v1alpha1.MonitorTemplateSpec) (*statuscake.T
 		scTest.WebsiteURL = http.URL
 		scTest.FollowRedirect = http.FollowRedirects
 		scTest.FindString = spec.HTTP.ShouldContain
+		scTest.EnableSSLAlert = spec.HTTP.VerifyCertificate
 
 		if spec.HTTP.ShouldNotContain != "" {
 			scTest.FindString = spec.HTTP.ShouldNotContain

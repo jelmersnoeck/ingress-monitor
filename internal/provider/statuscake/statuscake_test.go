@@ -8,7 +8,7 @@ import (
 
 	"github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
 
-	"github.com/manifoldco/statuscake"
+	"github.com/DreamItGetIT/statuscake"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -2,6 +2,15 @@
 
 
 [[projects]]
+  branch = "report-error-status"
+  digest = "1:bd2bac2300ffac00beb0627d28caf68134ba6a025e696377dcc201539bc57288"
+  name = "github.com/DreamItGetIT/statuscake"
+  packages = ["."]
+  pruneopts = ""
+  revision = "7787f0d178032a689483e50ea60d829d8a98b27e"
+  source = "github.com/manifoldco/statuscake"
+
+[[projects]]
   branch = "master"
   digest = "1:c0bec5f9b98d0bc872ff5e834fac186b807b656683bd29cb82fb207a1513fabb"
   name = "github.com/beorn7/perks"
@@ -163,14 +172,6 @@
   pruneopts = ""
   revision = "c2353362d570a7bfa228149c62842019201cfb71"
   version = "v1.8.0"
-
-[[projects]]
-  branch = "report-error-status"
-  digest = "1:3f62309bd34aaf76e1035048d037fd04760536b386ea7cb09cf4d9c6e7472dd0"
-  name = "github.com/manifoldco/statuscake"
-  packages = ["."]
-  pruneopts = ""
-  revision = "4a491c40dc01196e2b33b906a102db9aa3b9420c"
 
 [[projects]]
   digest = "1:63722a4b1e1717be7b98fc686e0b30d5e7f734b9e93d7dee86293b6deab7ea28"
@@ -705,9 +706,9 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/DreamItGetIT/statuscake",
     "github.com/dchest/blake2b",
     "github.com/golang/glog",
-    "github.com/manifoldco/statuscake",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/client_model/go",

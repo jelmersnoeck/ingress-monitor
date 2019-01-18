@@ -39,4 +39,6 @@ required = [
 
 [[constraint]]
   branch = "report-error-status"
-  name = "github.com/manifoldco/statuscake"
+  name = "github.com/DreamItGetIT/statuscake"
+  source = "github.com/manifoldco/statuscake"
+

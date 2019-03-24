@@ -1,10 +1,9 @@
 package logger
 
 import (
-	"log"
-
 	"github.com/jelmersnoeck/ingress-monitor/apis/ingressmonitor/v1alpha1"
 	"github.com/jelmersnoeck/ingress-monitor/internal/provider"
+	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -23,21 +22,21 @@ type prov struct{}
 
 // Create logs out a create action.
 func (p *prov) Create(ts v1alpha1.MonitorTemplateSpec) (string, error) {
-	log.Printf("Creating monitor %s", ts.Name)
+	logrus.Infof("Creating monitor %s", ts.Name)
 
 	return ts.Name, nil
 }
 
 // Delete logs out a delete action.
 func (p *prov) Delete(id string) error {
-	log.Printf("Deleting monitor %s", id)
+	logrus.Infof("Deleting monitor %s", id)
 
 	return nil
 }
 
 // Update logs out the update information for this template spec.
 func (p *prov) Update(id string, ts v1alpha1.MonitorTemplateSpec) (string, error) {
-	log.Printf("Updating monitor %s with ID %s", ts.Name, id)
+	logrus.Infof("Updating monitor %s with ID %s", ts.Name, id)
 
 	return id, nil
 }

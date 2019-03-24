@@ -13,7 +13,7 @@ import (
 	imfake "github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned/fake"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -349,7 +349,6 @@ type operatorConfig struct {
 
 	providers       []runtime.Object
 	templates       []runtime.Object
-	monitors        []runtime.Object
 	ingressmonitors []runtime.Object
 	crdObjects      []runtime.Object
 }
@@ -373,13 +372,6 @@ func withProviders(obj ...runtime.Object) optionFunc {
 func withTemplates(obj ...runtime.Object) optionFunc {
 	return func(op *operatorConfig) {
 		op.templates = append(op.templates, obj...)
-		op.crdObjects = append(op.crdObjects, obj...)
-	}
-}
-
-func withMonitors(obj ...runtime.Object) optionFunc {
-	return func(op *operatorConfig) {
-		op.monitors = append(op.monitors, obj...)
 		op.crdObjects = append(op.crdObjects, obj...)
 	}
 }

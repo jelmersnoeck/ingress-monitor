@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## v0.3.1 - 2019-03-24
+
+### Changed
+
+- We're now using logrus instead of the stdlib log package.
+
+## v0.3.0 - 2019-01-18
+
+### Added
+
+- Added functionality to ensure that SSL checks are enabled with StatusCake
+
 ## v0.2.0 - 2018-10-31
 
 ### Added

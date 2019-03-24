@@ -27,13 +27,10 @@ test: vendor
 	CGO_ENABLED=0 go test -v ./...
 
 linters:
-	go get -u github.com/alecthomas/gometalinter
-	gometalinter --install
+	go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 
 lint:
-	gometalinter --tests --disable-all --vendor --deadline=5m -e ".*generated.*" \
-		-E gofmt -E golint -E gosimple -E vet -E misspell -E ineffassign -E deadcode \
-		$(LINTER_PKGS)
+	golangci-lint run -D errcheck -D staticcheck ./...
 
 cover: vendor
 	CGO_ENABLED=0 go test -v -coverprofile=coverage.txt -covermode=atomic ./...

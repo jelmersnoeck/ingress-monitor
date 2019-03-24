@@ -21,12 +21,28 @@
 package main
 
 import (
+	"os"
+	"strconv"
+
 	"github.com/jelmersnoeck/ingress-monitor/internal/ingressmonitor/cmd"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 func main() {
 	viper.SetEnvPrefix("im")
+
+	debugString, ok := os.LookupEnv("DEBUG")
+	if ok {
+		debug, err := strconv.ParseBool(debugString)
+		if err != nil {
+			panic(err)
+		}
+
+		if debug {
+			logrus.SetLevel(logrus.DebugLevel)
+		}
+	}
 
 	cmd.Execute()
 }

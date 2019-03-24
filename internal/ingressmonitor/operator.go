@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"log"
 	"strings"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 
 	"github.com/dchest/blake2b"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -130,24 +130,24 @@ func (o *Operator) Run(stopCh <-chan struct{}) error {
 	defer o.monitorQueue.ShutDown()
 	defer o.ingressMonitorQueue.ShutDown()
 
-	log.Printf("Starting IngressMonitor Operator")
+	logrus.Infof("Starting IngressMonitor Operator")
 	if err := o.connectToCluster(stopCh); err != nil {
 		return err
 	}
 
-	log.Printf("Starting the informers")
+	logrus.Infof("Starting the informers")
 	if err := o.startInformers(stopCh); err != nil {
 		return err
 	}
 
-	log.Printf("Starting the workers")
+	logrus.Infof("Starting the workers")
 	for i := 0; i < 4; i++ {
 		go wait.Until(runWorker(o.processNextIngressMonitor), time.Second, stopCh)
 		go wait.Until(runWorker(o.processNextMonitor), time.Second, stopCh)
 	}
 
 	<-stopCh
-	log.Printf("Stopping IngressMonitor Operator")
+	logrus.Infof("Stopping IngressMonitor Operator")
 
 	return nil
 }
@@ -161,7 +161,9 @@ func (o *Operator) connectToCluster(stopCh <-chan struct{}) error {
 			return
 		}
 
-		log.Printf("Connected to the cluster (version %s)", v)
+		logrus.WithFields(logrus.Fields{
+			"cluster_version": v,
+		}).Info("Connected to the cluster")
 		errCh <- nil
 	}()
 
@@ -179,7 +181,7 @@ func (o *Operator) connectToCluster(stopCh <-chan struct{}) error {
 
 func (o *Operator) startInformers(stopCh <-chan struct{}) error {
 	for _, inf := range o.informers {
-		log.Printf("Starting informer %s", inf.name)
+		logrus.WithFields(logrus.Fields{"name": inf.name}).Info("Starting informer")
 		go inf.informer.Run(stopCh)
 	}
 
@@ -187,19 +189,20 @@ func (o *Operator) startInformers(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	log.Printf("Synced all caches")
+	logrus.Infof("Synced all caches")
 	return nil
 }
 
 func (o *Operator) waitForCaches(stopCh <-chan struct{}) error {
 	var syncFailed bool
 	for _, inf := range o.informers {
-		log.Printf("Waiting for cache sync for %s", inf.name)
+		log := logrus.WithFields(logrus.Fields{"name": inf.name})
+		log.Info("Waiting for cache sync for")
 		if !cache.WaitForCacheSync(stopCh, inf.informer.HasSynced) {
-			log.Printf("Could not sync cache for %s", inf.name)
+			log.Infof("Could not sync cache for")
 			syncFailed = true
 		} else {
-			log.Printf("Synced cache for %s", inf.name)
+			log.Infof("Synced cache for")
 		}
 	}
 
@@ -226,6 +229,9 @@ func (o *Operator) processNextMonitor() bool {
 }
 
 func (o *Operator) handleNextItem(name string, queue workqueue.RateLimitingInterface, handlerFunc func(string) error) bool {
+	log := logrus.WithFields(logrus.Fields{
+		"queue_name": name,
+	})
 	obj, shutdown := queue.Get()
 
 	if shutdown {
@@ -241,7 +247,7 @@ func (o *Operator) handleNextItem(name string, queue workqueue.RateLimitingInter
 		if key, ok = obj.(string); !ok {
 			queue.Forget(obj)
 
-			log.Printf("Expected object name in %s workqueue, got %#v", name, obj)
+			log.Infof("Expected object name workqueue, got %#v", obj)
 			return nil
 		}
 
@@ -250,12 +256,14 @@ func (o *Operator) handleNextItem(name string, queue workqueue.RateLimitingInter
 		}
 
 		queue.Forget(obj)
-		log.Printf("Synced '%s' in %s workqueue", key, name)
+		log.WithFields(logrus.Fields{
+			"key": key,
+		}).Debug("Synced key in workqueue")
 		return nil
 	}(obj)
 
 	if err != nil {
-		log.Printf(err.Error())
+		log.WithError(err).Error("Error handling the queue")
 	}
 
 	return true
@@ -312,30 +320,43 @@ func (o *Operator) OnDelete(obj interface{}) {
 
 		cl, err := o.providerFactory.From(obj.Spec.Provider)
 		if err != nil {
-			log.Printf("Could not get provider for IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
+			logDeleteErr("ingress_monitor", obj.Namespace, obj.Name, err, "could not get provider for IngressMonitor")
 			return
 		}
 
 		if err := cl.Delete(obj.Status.ID); err != nil {
-			log.Printf("Could not delete IngressMonitor %s:%s: %s", obj.Namespace, obj.Name, err)
+			logDeleteErr("ingress_monitor", obj.Namespace, obj.Name, err, "could not delete IngressMonitor")
 			return
 		}
 	case *v1alpha1.Monitor:
 		imList, err := o.imClient.IngressMonitors(obj.Namespace).
 			List(listOptions(map[string]string{monitorLabel: obj.Name}))
 		if err != nil {
-			log.Printf("Could not list IngressMonitors for Monitors %s:%s: %s", obj.Namespace, obj.Name, err)
+			logDeleteErr("monitor", obj.Namespace, obj.Name, err, "could not list IngressMonitors for Monitor")
 			return
 		}
 
 		for _, im := range imList.Items {
-			log.Printf("Deleting IngressMonitor `%s:%s` associated with deleted Monitor `%s:%s`", im.Namespace, im.Name, obj.Namespace, obj.Name)
+			ll := logrus.WithFields(logrus.Fields{
+				"ingress_monitor_namespace": im.Namespace,
+				"ingress_monitor_name":      im.Name,
+				"monitor_namespace":         obj.Namespace,
+				"monitor_name":              obj.Name,
+			})
+			ll.Debug("Deleting IngressMonitor")
 			if err := o.imClient.IngressMonitors(obj.Namespace).
 				Delete(im.Name, &metav1.DeleteOptions{}); err != nil {
-				log.Printf("Could not delete IngressMonitor %s for Monitors %s:%s: %s", im.Name, obj.Namespace, obj.Name, err)
+				ll.WithError(err).Error("could not delete IngressMonitor for Monitor")
 			}
 		}
 	}
+}
+
+func logDeleteErr(prefix, ns, name string, err error, msg string) {
+	logrus.WithFields(logrus.Fields{
+		fmt.Sprintf("%s_namespace", prefix): ns,
+		fmt.Sprintf("%s_name", prefix):      name,
+	}).WithError(err).Error(msg)
 }
 
 // handleIngressMonitor handles IngressMonitors in a way that it knows how to
@@ -435,11 +456,14 @@ func (o *Operator) garbageCollectMonitors(obj *v1alpha1.Monitor) error {
 		// reconciliation to take care of actually removing the monitor with the
 		// provider.
 		if !isActive {
-			log.Printf("Deleting IngressMonitor %s:%s with GC", im.Namespace, im.Name)
+			ll := logrus.WithFields(logrus.Fields{
+				"ingress_monitor_namespace": im.Namespace,
+				"ingress_monitor_name":      im.Name,
+			})
+			ll.Debug("Deleting IngressMonitor with GC")
 			if err := o.imClient.IngressMonitors(im.Namespace).
 				Delete(im.Name, &metav1.DeleteOptions{}); err != nil {
-
-				log.Printf("Could not delete IngressMonitor %s:%s: %s", im.Namespace, im.Name, err)
+				ll.WithError(err).Error("Could not delete IngressMonitor")
 			}
 		}
 	})
@@ -474,7 +498,7 @@ func (o *Operator) handleMonitor(key string) error {
 	}
 
 	if len(ingressList) == 0 {
-		log.Printf("No ingresses selected for %s:%s", obj.Namespace, obj.Name)
+		logrus.Infof("No ingresses selected for %s:%s", obj.Namespace, obj.Name)
 		return nil
 	}
 
@@ -578,7 +602,10 @@ func (o *Operator) handleMonitor(key string) error {
 				return fmt.Errorf("Could not ensure IngressMonitor: %s", err)
 			}
 
-			log.Printf("Successfully synced IngressMonitor %s:%s", im.Namespace, im.Name)
+			logrus.WithFields(logrus.Fields{
+				"ingress_monitor_namespace": im.Namespace,
+				"ingress_monitor_name":      im.Name,
+			}).Debug("successfully synced IngressMonitor")
 		}
 	}
 

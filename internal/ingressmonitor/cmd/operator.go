@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"log"
 	"os"
 	"time"
 
@@ -15,9 +14,10 @@ import (
 	"github.com/jelmersnoeck/ingress-monitor/pkg/client/generated/clientset/versioned"
 
 	"github.com/prometheus/client_golang/prometheus"
-
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -44,22 +44,22 @@ func runOperator(cmd *cobra.Command, args []string) {
 
 	resync, err := time.ParseDuration(operatorFlags.ResyncPeriod)
 	if err != nil {
-		log.Fatalf("Error parsing ResyncPeriod: %s", err)
+		logrus.WithError(err).Fatal("Error parsing ResyncPeriod")
 	}
 
 	cfg, err := clientcmd.BuildConfigFromFlags(operatorFlags.MasterURL, operatorFlags.KubeConfig)
 	if err != nil {
-		log.Fatalf("Error building kubeconfig: %s", err.Error())
+		logrus.WithError(err).Fatal("Error building kubeconfig")
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		log.Fatalf("Error building Kubernetes clientset: %s", err)
+		logrus.WithError(err).Fatal("Error building Kubernetes clientset")
 	}
 
 	imClient, err := versioned.NewForConfig(cfg)
 	if err != nil {
-		log.Fatalf("Error building IngressMonitor clientset: %s", err)
+		logrus.WithError(err).Fatal("Error building IngressMonitor clientset")
 	}
 
 	// register the available providers
@@ -88,11 +88,11 @@ func runOperator(cmd *cobra.Command, args []string) {
 		resync, fact, mtrc,
 	)
 	if err != nil {
-		log.Fatalf("Error building IngressMonitor Operator: %s", err)
+		logrus.WithError(err).Fatalf("Error building IngressMonitor Operator")
 	}
 
 	if err := op.Run(stopCh); err != nil {
-		log.Fatalf("Error running the operator: %s", err)
+		logrus.WithError(err).Fatalf("Error running the operator")
 	}
 }
 
